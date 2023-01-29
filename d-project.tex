@@ -1,3 +1,18 @@
+\newenvironment{prettylist}{
+	\begin{list}{
+		\footnotesize\raisebox{0pt}{\small\ding{121}}
+	}{
+		\setlength\topsep{2pt plus 1pt minus 1pt}
+		\setlength\leftmargin{2em}
+		\setlength\rightmargin{0pt}
+		\setlength\itemsep{1pt plus.1pt}
+		\setlength\parskip{0pt}
+		\setlength\parsep{0pt}
+		\setlength\itemindent{0pt}
+	}
+}{
+	\end{list}
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % These are the general sections to include.  %
 %                                             %
@@ -14,7 +29,62 @@
 \section{Introduction}
 \label{intro}
 
-The path of the righteous man is beset on all sides by the iniquities of the selfish and the tyranny of evil men. Blessed is he who, in the name of charity and good will, shepherds the weak through the valley of darkness, for he is truly his brother's keeper and the finder of lost children. And I will strike down upon thee with great vengeance and furious anger those who would attempt to poison and destroy My brothers. And you will know My name is the Lord when I lay My vengeance upon thee.
+The core of this work involves the practice of writing algorithms to analyze other algorithms under conditions of lost information.
+In particular, the proposed dissertation addresses the problem of analyzing symbol-stripped binary code. 
+This binary code lacks string identifiers that would aid in understanding the function of said code and useful statements often encounter hard problems, such as loop invariant inference.
+Despite the difficulties of analyzing such codes, notable targets of this work include the line-replacable units present in federated avionics systems, algorithms used to format PDF documents of historical importance, and programmable logic controllers used for the control of industrial processes, e.g. nuclear centrifuges.
+
+The proposed dissertation will systematize and address the strengths and weaknesses of emulation, dynamic analysis, modeling, and decompilation in understanding the semantics of a firmware image. 
+It will do so by synthesizing the concrete findings of four years of research in program analysis.
+
+The first act of the discussion centers on the domain of \emph{rehosting}, which allows codes in a specific physical domain, e.g. an ARM SoC with hardware sensors for controlling a quad-copter, to be executed and analyzed in another domain, e.g. a laptop computer.
+A primary goal of rehosting includes dynamic analysis of the a firmware image using existing offensive techniques, such as fuzzers, which cannot be carried out on the physical machine due to the possibility of damaging hardware or due to limitations on the capability of executing code.
+\emph{The Jetset work led to the discovery and reproduction of a privilege escalation attack on the CMU-900's VRTX operating system.}
+
+In discussing rehosting, the proposed dissertation will provide a greater level of technical depth and explanation on the Jetset system's approach to symbolic execution, namely, the use of symbolic execution in the inference of necessary hardware semantics for bootstrapping an emulation of a firmware image.
+It will discuss the limitations of existing abstract interpretation approaches and technologies, including those used in the paper, and identify concepts essential the abstract interpretation of binary code.
+The proposed dissertation will also discuss the issue of fuzzing rehosted systems and embedded systems in general, a problem that continues to see active research~\cite{zhu2022fuzzing}.
+
+The Jetset work introduces a specific problem: the precise modeling microarchitectural semantics and the algorithms embedded in binary code.
+The paper also does not include an in-depth discussion of the dynamic analyses possible on a rehosted system and the practical limitations of a rehosted medium.
+These findings set the stage for the additional perspectives on program analysis discussed in the remainder of the dissertation.
+When compared to rehosting, the exact modeling the algorithms embedded in binary code was discovered to be more powerful for certain applications.
+In particular, for the domain of PDF text redaction security.
+\emph{It was found that by exactly modeling the glyph shifting schemes of PDF document producers, novel information leaks could be ``fingerprinted'' and used to exactly de-redact the names of individuals excised from the PDF.}
+
+The proposed dissertation will explore the extraction of algorithms for PDF document production from standard executables.
+The utility and specifics of time-travel debugging, a form of data-flow analysis based upon stepping backwards and forwards in a program's execution, will be made more explicit than in published results.
+Limitations, such as the fact that manual effort is required to perform the debugging and only a single execution trace is recorded, will be made explicit.
+
+The discussion will also detail the differences between the extraction of process traces from an embedded system like the CMU-900 and from standard executables.
+Notably, it will discuss technical details involved in the dynamic analysis of embedded systems, including the necessity of trampoline code and the complexities of relocation created by the problem of binary code rewriting~\cite{wenzl2019hack}.
+This discussion provides future analysts and researchers with a blueprint for extracting glyph shifting schemes and exact reproductions of other algorithms from binary code, embedded or otherwise.
+
+The results of both of these prior works in rehosting and algorithm extraction suggested a more general solution to several of the difficulties of binary program analysis.
+In particular, there was an explicit need for a specification language and system allowing analysts to abstract arbitrary program slices into the domain of theorem provers like Z3~\cite{de2008z3}.
+Such a system would address the specific, hard problems of interpreting microarchitectural semantics (encountered and introduced by Jetset), by providing an interface for specifying these semantics to symbolic execution. 
+By working at the level of abstract interpretation, the system would also avoid the overapproximation involved in the analysis of a single dynamic execution trace encountered during the modeling PDF layout systems.
+
+The dissertation would therefore next address the InteGreat system, in submission to CAV 2023, which allows researchers to lift precise models of algorithms from embedded binary code.
+The system automates several of the difficult, manual analysis steps encountered when attempting to extract algorithms from closed source binaries through an object-oriented framework for program slice abstraction (function summarization~\cite{alt2017hifrog}).
+\emph{In particular, this lifting, when applied to a PLC, was useful in exactly reproducing and analyzing a code-upload attack precisely destabilizing the reactor pressure of a Eastman-Kodak chemical plant.}
+
+Summarizing, the key contribution of the proposed dissertation is therefore a set of empirically justified statements on potential solutions to practical problems encountered when performing binary program analysis, given the empirical perspective provided by three academic works.
+While not noted in this introduction, the findings also provide a well-supported argument for continued work on lifting systems and may help the uninitiated understand how computers construct meaning from symbols.
+The work also provides significant insights into the concept of \emph{information loss}, both at an abstract level (e.g. when text is redacted) and at a concrete level (e.g. when a variable's name is obsfucated during compilation).
+
+The work that composes the proposed dissertation has had immediate, broad impacts.
+Jetset's core finding, an exploit for the CMU-900's operating system, resulted in direct communications with avionics manufacturers on the security of their systems.
+The work on deredaction resulted in the discovery of hundreds of broken redactions, notifications of several affected parties, including the US Courts, and actions on behalf of several of these parties to prevent future information leaks. 
+Moreover, the InteGreat work has already begun to affect the direction of firmware rehosting research inside the Department of Energy.
+
+The contributions of the proposed dissertation will be:
+
+\begin{prettylist}
+\item A detailed technical explication of the techniques used to achieve significant results in three academic works, including the use of symbolic execution in firmware rehosting, full-system embedded firmware fuzzing, methodolgy for the extraction of glyph shifting algorithms for the purpose of breaking PDF text redactions, and the implementation of a framework for lifting continuous control equations from symbol-stripped binaries.
+\item Empirical results attesting to the (in)effectiveness of certain solutions to the problems program analysis. These problems include path explosion during symbolic execution, the interpretation and modeling of microarchitectural semantics, and information loss during the execution, compilation, and decompilation of programs.
+\item A synthesis of the concepts from otherwise disconnected, complex research works into a complete whole, providing a detailed narrative of the contemporary research landscape as it relates to systems for symbol-stripped binary code analysis and abstract interpretation of firmware images.
+\end{prettylist}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Section 2: Overview        %
