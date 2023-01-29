@@ -1,0 +1,33 @@
+\title. Maxwell Bland, February 2023
+
+\noindent {\bf \large Overview:}
+
+\noindent This dissertation will synthesize and systematize the knowledge of discoveries made during three diverse projects in program analysis. 
+It will recontextualize these projects' findings into a cohesive narrative and present hereto unaddressed technical details, algorithms, and methodological steps adopted but not discussed within the three academic articles due to space constraints. 
+These three projects have resulted in both accepted and in-submission peer-reviewed conference publications at USENIX Security, the Privacy Enhancing Technologies Symposium (PETS), and Conference on Computer Aided Verification (CAV). 
+
+\noindent
+First, the present author was responsible for a significant part of the implementation of the Jetset firmware rehosting system~\cite{johnson2021jetset}. 
+The present author's contributions included techniques and ideas central to the work, such as dynamic callchain resolution and the implementation of a rudimentary symbolic execution system based upon taint tracking with the QEMU embedded device emulator~\cite{bellard2005qemu}. 
+The author's contributions also included the development of one of the first architecture independent full-system fuzzers for embedded systems requiring no modification to the target firmware. 
+The work led to the discovery of over 200 faulting system call codepaths within the Communication Management Unit 900 (CMU-900) used by Boeing 737 aircraft. 
+The author used these codepaths and a sophisticated code upload attack to write and confirm a privilege escalation exploit on both an emulated and physical version of the CMU-900.
+
+\noindent
+Second, the author was almost entirely responsible for the implementation of, evaluation, and discovery of novel deredaction attacks on PDF documents through the use of models of ``glyph shifting scheme'' algorithms used by popular document editors (Microsoft Word and Adobe Acrobat). 
+The attacks in question revealed information leaks that rendered the redaction of names from several documents of historical relevance ineffective. 
+The models of algorithms in question were recovered using a key insight: the combination of single core, virtualized execution with ecent innovations in time-travel debugging~\cite{schulz2018blast}. 
+The work resulted in the discovery of hundreds of newly vulnerable redactions, the discovery of an entire new class of text redaction vulnerabilities, and significant efforts on behalf of affected parties to change present text redaction practice.
+
+\noindent
+Third, the author is responsible for and the primary contributor to a novel lifting approach which extends the abilities of existing binary firmware symbolic executors, such as angr~\cite{wang2017angr}, to recover continuous control equations from symbol-stripped firmware.
+By soundly and automatically translating arbitrary program slices into symbols for uninterpreted functions, the InteGreat system was able to decompile symbol-stripped ARM assembly routines into Matlab Simulink functions usable in a continuous model of the environment. 
+The system was used to find bugs in the implementation of a quad-copter orientation estimation algorithm,reproduce and model the effects of a code upload attack on the reactor pressure of a chemical plant, and identify novel limitations in the emulations synthesized by firmware rehosting systems.
+
+\noindent {\bf \large Intellectual Merit:}
+
+\noindent The proposed dissertation will provide commentary and a cohesive narrative or philosophy to the three works in question. It will also include valuable technical details and insight into the implementation of the three systems and the deeper problems of program analysis encountered in the study of embedded systems.
+
+\noindent {\bf \large Broader Impacts: }
+
+\noindent The works have led to responsible vulnerability disclosure to UTC Aerospace, the stakeholder of the CMU-900, and the disclosure of significant numbers of broken redactions to government agencies, and patentable code artifacts for use by the Department of Energy. The proposed dissertation will include further work to cement these impact of discovered redaction vulnerabilities and the continuous equation lifting artifact.
