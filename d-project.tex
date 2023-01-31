@@ -31,187 +31,134 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Section 2: Overview        %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Background}
-This section addresses the necessary background to understand the methodologies present in Section~\ref{sec:methods}. 
-We begin by disucssing related work in firmware rehosting and the analysis of embedded systems.
-Following from this, there is a brief discussion of deredaction in the context of reverse engineering---primarily, the recovery of algorithms involved in the specification of PDF documents.
-Finally, we end with prior work in the verification and abstract interpretation of binary code semantics.
-
-\subsection{Firmware Rehosting and Analysis}
-
-The process of understanding or attacking a system like the Communication Management Unit of a Boeing 737 typically begins with the extraction of the firmware, or binary code, from hardware (flash units) storing this data, either via desoldering or via the use of wired connections~\cite{milburn2018there}.
-Once this code is extracted, it is typically brought into a decompiler, such as Ghidra~\cite{eagle2020ghidra}, which lifts the binary code back into a pseudo-C representation from an intermediate representation.
-This intermediate representation is typically a language with semantics that allow the decompiler to target diverse microarchitectures and allow algorithms operating on the intermediate representation to more easily perform decompilation~\cite{cifuentes1995decompilation}.
-The recovered pseudo-C representation may then be reverse engineered and experimented with by researchers to better understand how the firmware functions.
-
-However, the process of decompilation itself involves several concepts of importance to the proposed dissertations, and continues to be an active area of research~\cite{chen2019survey}.
-Of these, the proposed work focuses on \emph{abstract interpretation}, introduced by Cousot and Cousot around 1977~\cite{cousot1977abstract}, a model for the static analysis of programs by the construction or approximation of fixpoints, or lifting (microarchitectural) semantics from concrete to abstract domains.
-
-The abstract interpretation of binary programs has several equivalents, and has deeper ties into the notion of data-flow recovery and taint-tracking~\cite{schwartz2010all}.
-Abstract interpretation, when applied to binary code, is often referred to as symbolic execution, for which there are several notable systems, with more popular recent examples including KLEE and angr~\cite{cadar2008klee,wang2017angr}
-These systems often work by recording symbolic variants of concrete operations.
-For example, the statment $(x > 5) ?\ y + 1 : x + 1$ would be concretely evaluated to 4 if $x = 3$, however, under symbolic execution, the system will record the pair $(x<=5; x=x+1),(x>5;x=y+1)$ into a symbolic state, representing the two possible execution paths.
-A symbolic executor and other routines for static analysis are present in the Ghidra decompiler, in order to provide an accurate and reconfigurable reverse engineering and decompilation environment.
-
-\textbf{Emulation and Dynamic Analysis.} One reasonable next step, beyond the decompilation of the program, is to attempt to \emph{run} the program and analyze this execution, a subdomain referred to as dynamic analysis, introduced by Ball in 1999~\cite{ball1999concept}.
-For contexts in which the binary code under evaluation may be run on readily available hardware with the capability for instrumentation, it can be debugged, the execution may be traced and evaluated, or \emph{fuzzed}, inputs can be given to the system in an intelligent or random manner in order to fully evaluate the behavior of said system~\cite{li2018fuzzing}.
-
-However, it is often \emph{not} the case that a binary program can be executed in an environment that allows for instrumentation and dynamic analysis.
-Emulators, such as QEMU~\cite{bellard2005qemu}, attempt to correct for this by reproducing the context the original binary code was expecting to be emulated within, by simulating hardware interactions and by reinterpreting instructions into an microarchitecture-independent intermediate representation that may be executed on a virtual machine.
-
-\textbf{Rehosting.} The implementation of emulators is often an arduous process, involving careful study and a precise understand of the target system and hardware context. 
-The domain of \emph{firmware rehosting} attempts to automate this process, though various approaches.
-Both FIE~\cite{fie} and Jetset~\cite{johnson2021jetset} attempted to use a symbolic execution to bootstrap emulators for embedded firmware: they generate symbolic constraints for algorithms the firmware uses to interact with hardware, identify execution paths leading to a desired point in the firmware's execution, and then solve the constraint sets for that path in order to recover the precise memory reads necessary to trigger that path.
-Firmadyne~\cite{firmadyne} and Costin et al.~\cite{costin2014large, costin2016automated}, incontrast, attempted to just match the hardware interaction constraints of specific software, i.e. the Linux kernel and networking stacks.
-Pretender~\cite{pretender2019} attempted to rehost firmware by recording the interactions between the physical hardware and the firmware. 
-HALucinator~\cite{clementshalucinator} is a firmware rehosting tool that uses hueristics to locate the code belonging to the hardware abstraction layer (a vendor-provided API for interacting with the hardware) in the firmware and replace it with handlers that properly simulate the hardware interaction.
-P\textsuperscript{2}IM~\cite{p2im2020} performed fuzzing to identify the correct hardware read values necessary to trigger a particular program path. 
-
-The ultimate result of rehosting is, ideally, a system capable of executing the firmware and reproducing key system behaviors, e.g. a system that can be accurately fuzzed. 
-Such a digital twin is also useful in several contexts, including the generation of digital twin systems that replicate the functioning of a complex cyberphysical system and its environment in software.
-However, the domain still faces several challenges, including fidelity, firmware acquisition, static analysis for bootstrapping rehosting systems, parallelized emulation, and even after successful identification, vulnerability identification and integration of the emulation into other systems~\cite{wright2021challenges}.
-
-The proposed disseration will shed further light on the problem of rehosting introduced by these prior works, hinted at in the methodologies of Sec.~\ref{sec:methods}, and serve to further connect the problems of rehosting to the problems of abstract interpretation and meaning-making of binary codes in the presence of lost information (e.g. hardware components, symbols).
-
-\subsection{Deredaction and Information Leaks}
-Rehosting is related to deredaction in that both problems relate to the recovery of lost information.
-In the former case, the function of a system in an original, physical context, and in the latter, a removed text.
-To identify these parallels and better understand information loss, the proposed dissertation next addresses the problem of \emph{deredaction}, with particular focus on PDF text.
-
-When text is removed from a document in the classical sense, using a black marker or white-out, the width of the text is still observable given the surrounding words~\cite{egyptian}.
-Considering this alone as a \emph{perfect} process on a monospaced font, the words ``cat'' and ``dog'' become indistiguishable.
-However, the information loss is almost never perfect: for example, in Times New Roman, the words ``cat'' and ``dog'', if redacted, are distinguishable by their widths.
-Information leaks present in redacted PDF documents were identified by Lopresti and Spitz~\cite{lopresti2004quantifying}, who developed a system for breaking redactions where the precise TTF width was known.
-
-However, the Lopresti and Spitz work ended up failing to account for several important aspect of the problem: first that a rasterization workflow may change a PDF document's glyph positioning and physical printing may not be a pixel-perfect reproduction of the digital document, and second, that TTF glyph widths do not necessarily equate with PDF document or raster glyph widths.
-Moreover, they missed an additional, severe facet of the problem: that in PDF documents, width alone was not being leaked: there are also sub-pixel sized shifts applied to non-redacted glyphs that can be \emph{dependent} on redacted glyphs' data.
-This was the subject of \emph{Story Beyond the Eye}, a work narrativized by the proposed dissertation~\cite{bland2022story}.
-
-It is useful to consider, then, the two failures of information recovery, both unknown unknowns and unknown knowns, cases where a leak of aspect of information is not captured and cases where it is misinterpreted~\cite{vzivzek2004rumsfeld}.
-Thus, there is a wealth of literature on the improper removal of information from digital files that follows this pattern, and \emph{Story Beyond the Eye} also, understandably, only partially solves the problem.
-Forrester and Irwin~\cite{forrester2005investigation} discuss nonexcising redactions and unscrubbed metadata such as the Producer field of PDF documents but do not mention glyph positioning based deredaction.
-Hill et al., used hidden Markov models to recover text obscured either by mosaic pixelization or a related tactic, e.g. Gaussian Blur~\cite{hill2016effectiveness}, but fail to deredact text obscured by a single box.
-While M{\"u}ller et al.~\cite{muller2021processing} discuss hidden information present in PDF documents, specifically PDF document revision information and author name metadata, but do not explicitly tackle redaction.
-Other file formats may also be deredacted: Murdoch and Dornseif~\cite{murdochmisc} discuss how cropped JPEGs can preserve uncropped image information, but these works do not dicuss text redaction in particular.
-
-Irrespective of the studied medium (PDF redaction, JPEG redaction) information left or destroyed is always a result of a communication system~\cite{ash2012information}, and in most cases this data flow is determined by a software system---by binary code interpreting binary code.
-Thus the proposed dissertation will highlight a portion of \emph{Story Beyond the Eye} not discussed in the publication, the extraction of exact models of PDF text positioning algorithms from closed-source software.
-
-\subsection{Function Summarization and Code Lifting}
-
-Naturally, as a result of similar problems to those encountered in \emph{Story Beyond the Eye}, there is a wealth of research on the subject of \emph{function summarization} and lifting of firmware binaries, particularly within the software verification and reverse engineering communities.
-The immediate form of this problem is software clone identification, which attempts to find identical program slices across binaries~\cite{zhang2021survey}, while the theoretical landscape stretches to the generation of a precise abstract interpreter from a system of logic~\cite{thakurR12}.
-\emph{Function summarization} is defined as follows~\cite{interpolation}:
-
-\emph{Let $f$ be a function, $v$ a bound on the number of unrolled loops and recursive calls, $R_{v}^{f}$ a set of tuples of computations in $f$ over $v$, $\mathbb{D}$ a domain function mapping from inputs to outputs of $f$, then $S$ s.t. $R_{v}^{f} \subseteq S \subseteq \mathbb{D}$ is a summary of $f$.}
-
-The necessity of loop unrolling here is somewhat strict and can be replaced by inferred invariants~\cite{furia2014loop}.
-\emph{Binary lifting} raises machine instructions to higher-level intermediate representations (IR) such as LLVM~\cite{anand2013compiler,di2017rev,dinaburg2014mcsema}.
-The value provided by summarization and lifting is the precise association and identification of useful information within a binary program.
-
-The final work the proposed dissertation integrates, InteGreat~\cite{bland2023integreat}, reinterprets bitvector-domain symbolic execution into the theory of uninterpreted functions to perform modular, nestable function summarization and decompilation.
-It provides a specification language that allows users to abstract arbitrary program slices in symbol-stripped binary code with symbols and statements in systems of logic.
-
-Of course, a long line of work has utilized symbolic execution to perform model extraction and subsequently verification on the extracted models.
-SPIN~\cite{spin}, defined the term ``model extraction'' and applied model-checking on aero-space flight software.
-Babi\'c and Hu~\cite{babic2007structural} used natural abstraction boundary identification and symbolic execution to optimize the performance of verification.
-Hernandez et al.~\cite{firmusb} and~\cite{cryto-symex} used symbolic execution to extract and verify protocol models.
-The same authors also noted the importance of rounding the floating-point precision error on verifying their extracted models in~\cite{precision}.
-Jackson and Woodward~\cite{lightweight-oo} extracted object-oriented (OO) models from Java bytecode,~\cite{oo-model} extracted OO data models from weakly-typed source code. 
-Bandera~\cite{tool-supported-program-abstraction} is a tool for user-guided extraction of finite-state automata from Java programs, however, the tool requires access to source code, and focuses on abstracting single variables rather than program slices.
-While these techniques could improve InteGreat, prior work does not address the possibility of a generic language for the specification of these abstraction extraction boundaries, and does not solve the specific problems involved in stiching together uninterpreted functions as abstractions.
-
-Ji et al.~\cite{transformation} perform backward application of extended sequent calculus rules on symbolic expression trees.
-InteGreat's approach, abstraction resolution, is similar to a sequent calculus approach.
-However, this work symbolically executes by sequent calculus rules and does not attempt summarization. 
-Instead, the goal of the work is bisimulation and optimization of the analyzed algorithms.
-
-The closest work to InteGreat is Currie et al.~\cite{currie2006embedded}. 
-Currie et al. \emph{only} consider the problem of equivalent programs across compiler optimizations, and do not use uninterpreted functions to target \emph{decompilation}, only to check equality.
-This is a stictly easier problem than the one we solve, because we address the necessity of retaining viable semantics before and after skipping a program slice (by identifying side-effects of the removed slice automatically).
-
-The proposed dissertation ...
-
-\subsection{Remaining Problems and Goals}
-A clear description of the remaining problems and goals.
+\input{background}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Section 3: Research Plan   %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Research Methodology}
 \label{sec:methods}
-A lot of things can change in twelve years, Admiral. I suggest you drop it, Mr.\ Data. Wouldn't that bring about chaos? Ensign Babyface! We finished our first sensor sweep of the neutral zone. I guess it's better to be lucky than good. I am your worst nightmare! Well, I'll say this for him, he's sure of himself. Damage report! What's a knock-out like you doing in a computer-generated gin joint like this? Congratulations, you just destroyed the Enterprise. About four years. I got tired of hearing how young I looked. Fate. It protects fools, little children, and ships named ``Enterprise.'' Your shields were failing, sir. Run a manual sweep of anomalous airborne or electromagnetic readings. Radiation levels in our atmosphere have increased by 3,000 percent. Electromagnetic and subspace wave fronts approaching synchronization. What is the strength of the ship's deflector shields at maximum output?
 
-\subsection{A component of your plan}
+The following section introduces the methodologies and technical contributions of the Jetset, \emph{Story Beyond the Eye}, and InteGreat works.
+In each subsection, an overview of the work is provided and then followed by an explanation of the specific technical contributions the dissertation will expand upon and discuss.
 
-\setlength\intextsep{0pt}
-\begin{wrapfigure}[20]{R}{2.4in}
-\vspace{-5pt}
-\centering
-\includegraphics[width=2.4in]{figures/sample1}
-\caption{A sample figure that is wrapped by text.}
-\label{fig1}
-\end{wrapfigure}
+\subsection{Jetset}
 
-Lorem Khaled Ipsum is a major key to success. To be successful you've got to work hard, to make history, simple, you've got to make it. The first of the month is coming, we have to get money, we have no choice. It cost money to eat and they don't want you to eat. Fan luv. 
+The Jetset system uses symbolic execution to infer what behavior firmware expects from a target hardware device.
+It recovers traces of the expected I/O behavior, and then generates device models for hardware peripherals in C, allowing the an analyst to boot the firmware in an emulator.
+Jetset was applied to 13 firmware images, the most complex of which were a Feeder Protection Relay, the Communication Management Unit of a Boeing 737, and a Raspberry Pi.
+The emulated firmware image also facilitates fuzz-testing, and a custom, architecture-independent fuzzer for QEMU, requiring no firmware modification, was used to discover a previously unknown privilege escalation vulnerability.
 
-Surround yourself with angels, positive energy, beautiful people, beautiful souls, clean heart, angel. You smart, you loyal, you a genius. Give thanks to the most high. We the best. I told you all this before, when you have a swimming pool, do not use chlorine, use salt water, the healing, salt water is the healing.
+\subsubsection{Techniques}
 
-In life there will be road blocks but we will over come it. The other day the grass was brown, now it's green because I ain't give up. Never surrender. You do know, you do know that they don't want you to have lunch. I'm keeping it real with you, so what you going do is have lunch. Don't ever play yourself. 
+The core of Jetset is composed into three parts: \emph{specification}, \emph{peripheral inference and synthesis} and \emph{search strategy}. 
 
-We don't see them, we will never see them. I'm up to something. Surround yourself with angels, positive energy, beautiful people, beautiful souls, clean heart.
-
-\begin{wraptable}[15]{r}[0.01in]{4.5in}
-\label{table1}
-\caption{A sample table wrapped by text.}
-\begin{center}
-\vspace{-10pt}
-\scriptsize
-\begin{tabular}{  c  c  c  }
-\hline
-\hline
-Stability & $M_u$ & $M_{\tau}$ \\ 
-\hline\hline\\
-Neutral & $\cfrac{z}{z_\Delta} - \cfrac{\ln(z/z_o)}{\ln(z_\Delta/z_o)}$ & $\cfrac{z}{z_\Delta} - \cfrac{1}{\ln(z_\Delta/z_o)}$\\\\
-\hline \\
-Stable & $\left(1 - \cfrac{\Psi}{2}\right)\cfrac{z}{z_\Delta} - \left(1 - \cfrac{\Psi_\Delta}{2}\right)
-\left(\cfrac{\ln(z/z_o)-\Psi}{\ln(z_\Delta/z_o)- \Psi_\Delta}\right)$ & $\cfrac{z}{z_\Delta} - \cfrac{\left(1 - \cfrac{\Psi_\Delta}{2}\right)}{\ln(z_\Delta/z_o) - \Psi_\Delta}$\\\\
-\hline \\
-Unstable & $\cfrac{4}{3}\left[\left(\cfrac{1-x^3}{1-x_{\Delta}^{4}}\right) -  \left(\cfrac{1-x_{\Delta}^3}{1 - x_{\Delta}^{4}}\right)\left(\cfrac{\ln(z/z_o)-\Psi}{\ln(z_\Delta/z_o)- \Psi_\Delta}\right)\right]$ & $\cfrac{z}{z_\Delta} - \cfrac{\cfrac{4}{3}\left(\cfrac{1-x_{\Delta}^3}{1 - x_{\Delta}^{4}}\right)}{\ln(z_\Delta/z_o) - \Psi_\Delta}$\\\\
-\hline
-\hline
-\end{tabular}
-\end{center}
-\end{wraptable}
-
-
-Egg whites, turkey sausage, wheat toast, water. Of course they don't want us to eat our breakfast, so we are going to enjoy our breakfast. They don't want us to win. Major key, don't fall for the trap, stay focused.  It's the ones closest to you that want to see you fail. Always remember in the jungle there's a lot of they in there, after you overcome they, you will make it to paradise. The key to more success is to get a massage once a week, very important, major key, cloth talk.
-
-% I found it useful to include a summary of the proposed work
-% given in each subsection to help out reviewers.
-\subsubsection{Specific tasks for this research component}
+The \emph{specification} fed to Jetset consists of three parts, which must be attained via alternative means.
 \begin{itemize}
-\setlength\itemsep{0em}
-\item Do a thing and blow your mind
-\item Question your life choices
-\item Drink coffee
+	\item The \textbf{binary code} of the target, which must be read out of a physical flash or extracted from the target by some other means.
+	\item The \textbf{memory layout} of the target, which specifies how physical devices are mapped into the memory of the device, and is used to determine which reads and writes are key to peripheral inference.
+	\item The \textbf{entry point} of the target, e.g. where execution begins. In this sense, Jetset attempts a \emph{brute force} inference of the target, by beginning inference from the absolute start of execution. This stands in contrast to InteGreat, discussed later.
+	\item A \textbf{goal address} to reach within the target. Jetset explores \emph{a single} execution path to a specific firmware state, and employs a \emph{single} search strategy to get to this target. This again will stand in contrast to InteGreat.
 \end{itemize}
 
-\begin{center}
-\begin{minipage}{.3\textwidth}
-\begin{equation}
- \bar u = \bar u_{ll} + u_* \beta M_{u} \label{new_u}
-\end{equation}
-\end{minipage}
-\begin{minipage}{.36\linewidth}
-\begin{equation}
-  \tau_{xz} = u_* u_{*ll} + \kappa u_*^2 \beta M_{\tau} \label{new_tau} \mbox{ ,}
-\end{equation}
-\end{minipage}
-~\\Sample equations that consume minimal space.
-\end{center}
+This specification is then used to begin the process of \emph{peripheral inference and synthesis}, the former of which consists of symbolically executing the firmware to infer what values should be returned by reads from device registers.
+The symbolic execution uses a taint-tracking system build on top of the QEMU TCG intermediate representation, paired with the angr constraint solver, to determine which read values are necessary to achieve a particular execution trace.
+This union between taint tracking and symbolic execution was noted in~\cite{schwartz2010all}.
 
+Importantly, work in this domain, including the famous SymQEMU~\cite{poeplau2021symqemu} and Jetset, ignore the necessity of symbolically executing the hundreds of TCG helper methods essential to QEMU~\cite{tcghelper}, which capture important microarchitectural operations, even as simple as branches, by directly modifying QEMU's state rather than by executing a TCG IR operation.
+Thus, both Jetset and SymQEMU fail to account for significant microarchitectural semantics that are necessary for the soundness of the systems in the general case, even if they work on the evaluation targets persent in their publications.
+\emph{Any} work based upon the TCG IR alone that does not address the helper methods will be unsound.
+InteGreat addresses this problem with zero-length program slices that \emph{could} contain the semantics of TCG helper methods, though the goal of this paper is to provide a more general interface to some of the key problems of symbolic execution, rather than problems encountered when using QEMU.
 
+The synthesis stage for peripherals recovers the specific model by making a call into angr's wrapper around the Z3 solver to find a concrete value that satisfies the constraints necessary to execute the desired program path.
+
+\begin{figure}
+\centering
+%\includegraphics[width=8cm]{diagrams/distance_func.png}
+\input{distance_func}
+\caption{Context-sensitive distance from statement 5 (in first \texttt{foo} call) to statement 7 (of second \texttt{foo} call).}
+\label{fig:distance_func}
+\end{figure}
+
+For the purposes of finding a goal location in the firmware, Jetset naively applies just a single \emph{search strategy} to locate a target execution point, a combination of Tabu search, a variation of depth-first search guided by a distance function with a list of ``avoid'' states and a context-sensitive distance function generated by resolving the callgraph of dynamically resolved function calls during symbolic execution.
+The latter is achieved by ``stitching'' the discovered call target address during the symbolic execution into the recovered control flow graph so far.
+An overview of this process is given in Fig.~\ref{fig:distance_func}.
+
+By adding the context of the child-call CFG as calls are resolved at runtime, Jetset takes into account the fact that the distance between two instructions in a program can depend on the calling context, i.e. the call-stack of the two instructions.
+Because programs may modify their own callstack to perform returns to different locations, distance from the goal location is computed lazily from the actual stack during execution.
+
+When Jetset is not able to resolve a path to the target due to indirect or runtime-calculated function pointers, it alternates between resolving branches as \emph{true} or \emph{false}, allowing it to escape from exploring the same loop resolution condition infinitely.
+
+\subsubsection{Methodology}
+
+\input{data}
+
+\begin{table*}
+\small
+\centering
+\caption{Evaluation targets and summary statistics.}
+\label{tab:targets}
+\input{jetsettargets}
+\vspace{\baselineskip} % Terrible, but out of time.
+\end{table*}
+
+Jetset's evaluation was dependent upon getting several firmware images into a steady state emulation, where the emulator would run without crashing.
+The core targets for this evaluation were a Raspberry Pi 2, a single-board computer based on the Broadcom BCM2836 system-on-a-chip (SoC); a Collins Aerospace CMU-900, an electronic system used on many Boeing 737 aircraft, responsible for handling digital communications between the aircraft and ground stations with an AMD Am486, Intel 486-compatible processor; and a Schweitzer Engineering Laboratories SEL-751 feeder protection relay, used to protect power grid systems, leveraging a MCF54455, a 32-bit microprocessor implementing the ColdFire ISA.
+The statistics on the emulation of these systems are given in Table~\ref{tab:targets}.
+
+Details on the emulated and symbolically executed versions of the execution are given by the top and bottom portions of the table. 
+Differences, in generally, are explanable due to the backtracking of symbolic execution when it hits an infinite loop (in these cases Jetset must re-execute code and take a different path), and due to slower inference-stage execution.
+In the case of the Raspberry Pi, this led to an SD host controller command timeout, resulting in an error message and a register dump. 
+During emulated execution with synthetic devices, the SD host controller initializes without a command timeout, thus, the executed blocks counts differ; however, the resulting emulation is resilient. 
+
+While it was not addressed in the original publication, the testing of these systems also involved significant amounts of fuzz-testing using a custom built fuzzer that integrated AFL and QEMU, similar to FirmAFL~\cite{zheng2019firm}, but without requiring the modification of the target program.
+It achieved this feat by performing a process-tree snapshot of the entire QEMU process while preserving speed by mounting QEMU's files into a RAM filesystem.
+In the proposed dissertation, more detail on this fuzzer's implementation and the technical novelties would be provided---valuable due to the fact that the fuzzer has seen continued use after the paper's publication by a number of unaffiliated researchers.
+
+The two targets of fuzzing were the Raspberry Pi and the CMU-900.
+Both fuzzing sessions targeted the OS system call boundaries of Linux and VRTX, respectively.
+While no novel vulnerabilities were found in Linux, all recovered fuzzing outputs were equivalent between the emulateed and physical versions of the Raspberry Pi.
+The CMU-900, however, had significantly more successful results.
+The AFL fuzzer found 2963 unique code paths during 200 hours of fuzzing, over 200 of which resulted in meaningful crashes.
+One of these code paths, crashing on a function return, was bootstrapped into a privilege escalation vulnerability using a ROP chain by the author.
+
+To validate this exploit on the physical device, for which the firmware version was different, the author had to build a ground truth QEMU emulation for the second firmware, and then write dataloading code to upload an also-handcrafted, shimmed version of the VRTX operating system which could inject the malicious system call at a realistic point in the physical device's execution.
+This process was successful, and due to the complexity of relocating the shim code on the memory-constrained physical device while maintaining a true-to-reality execution of the system, required hundreds of lines of hand-written x86 assembly.
+
+The discovery and crafting of this exploit would be further elucidated and detailed within the proposed thesis, and is valuable as it later led to the discovery of three remote denial-of-service vulnerabilities on the CMU-900 (unpublished), that cause the machine to crash due to maliciously crafted aircraft communication and reporting system (ACARS) messages.\footnote{Because ACARS messages also have a ``broadcast'' mode, these messages couldbe used to crash a large number of airplanes' CMU-900's simultaneously.}
+
+\subsubsection{Discussion}
+
+The Jetset work was a novel contribution to a yound domain of firmware rehosting, and thus, the techniques and methodologies adopted during symbolic execution and fuzzing had limitations. 
+For one, the resulting emulation was not \emph{perfect}.
+However, a perfect emulation was not necessary for useful results.
+While Jetset only explored and inferred constraints for a single execution path, the results of fuzzing these emulations led to a real vulnerability that was disclosed to the embedded system's vendor.
+
+For another, the current technical landscape of of symbolic execution and fuzzing on embedded systems is severely limited by support for microarchitectural abstractions, as, to the author's knowledge, all current embedded system fuzzers require modifications to the firmware under evaluation, and all symbolic executors fail to support all complex processor features, e.g. x86 task switching.
+\emph{The proposed dissertation will address solutions to this limitation, both in the presentation of InteGreat and in detailing the construction of yAFL, the fuzzer Jetset used to discover the CMU-900 vulnerability.}
+
+\subsection{Story Beyond the Eye}
+
+In \emph{Story Beyond the Eye} we found that many current redactions of PDF text are insecure due to non-redacted character positioning information, determined by the \emph{glyph shifting} algorithms PDF producers use.
+Subpixel-sized horizontal shifts in redacted and non-redacted characters can be recovered and used to effectively \emph{deredact} first and last names---these shifts add additional information to the width of redacted information and can be dependent upon redacted information but not themselves redacted.
+These findings affected redactions where the text underneath the black box is removed from the PDF.
+
+The system uses models of glyph shifting algorithms to correctly fingerprint the information left by redacted text, and was able to ``break'' hundreds of real-world PDF redactions, including in documents of historical relevance, OIG investigation reports, and FOIA responses.
+The work also included an extensive notification of affected parties, demonstrating the broad impact of the work.
+
+\subsubsection{Methodology}
+\subsubsection{Techniques}
+\subsubsection{Discussion}
+
+\subsection{InteGreat}
+
+InteGreat reinterprets bitvector-domain symbolic execution of program slices into the theory of uninterpreted functions to perform modular, nestable function summarization and decompilation.
+The tool provides researchers with a novel design language for automatically abstracting complex programs into mathematical equations.
+In the submitted publication, InteGreat's lifting was used to determine the sensor inputs necessary to precisely destabilize the reactor pressure of a chemical plant, discover novel problems in the domain of firmware rehosting, and discover a flaw in the implemented version of a published quad-copter stabilization algorithm.
+
+\subsubsection{Methodology}
+\subsubsection{Techniques}
+\subsubsection{Discussion}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Section 4: Management Plan %

@@ -1,0 +1,40 @@
+\begin{tabular}{@{}lllrrr@{}}
+  \toprule
+  \quad                       &                                                     & \multicolumn{2}{r}{\textbf{\rpitwo}}      & \textbf{\cmutarg}            & \textbf{\seltarg}            \\
+  \midrule
+  \multicolumn{2}{@{}l}{CPU/SoC} & \multicolumn{2}{r}{Broadcom BCM2836 (ARM)}       & AMD~Am486 (i386)             & NXP~MCF54455 (ColdFire)                                   \\
+  \multicolumn{2}{@{}l}{OS/SW}   & \multicolumn{2}{r}{Linux 4.19.y}                 & VRTX-32                      & G5.1.5.0                                                  \\
+  \multicolumn{3}{@{}l}{\emph{Peripheral inference}}                                                                                                                                                                        \\
+                              & \multicolumn{2}{l}{Wall-clock time}                 & \rpiInfWallClockTime                        & \cmuInfWallClockTime        & \selInfWallClockTime        \\
+                              & \multicolumn{2}{l}{Blocks in code base}             & \rpiInfBlocksInCode                         & \cmuInfBlocksInCode         & \selInfBlocksInCode         \\
+                              & \multicolumn{2}{l}{Total blocks executed}           & \rpiInfTotalBlocks                          & \cmuInfTotalBlocks          & \selInfTotalBlocks          \\
+                              & \multicolumn{2}{l}{Blocks executed on path}         & \rpiInfTotalBlocksOnPath                    & \cmuInfTotalBlocksOnPath    & \selInfTotalBlocksOnPath    \\
+                              & \multicolumn{2}{l}{Unique blocks executed}          & \rpiInfUniqueBlocks                         & \cmuInfUniqueBlocks         & \selInfUniqueBlocks         \\
+                              & \multicolumn{2}{l}{Unique blocks executed on path}  & \rpiInfUniqueBlocksOnPath                   & \cmuInfUniqueBlocksOnPath   & \selInfUniqueBlocksOnPath   \\
+                              & \multicolumn{2}{l}{\mmio\ writes (ignored) on path} & \rpiInfWritesOnPath                         & \cmuInfWritesOnPath         & \selInfWritesOnPath         \\
+                              & \multicolumn{2}{l}{\mmio\ reads (symbolic) on path} & \rpiInfReadsOnPath                          & \cmuInfReadsOnPath          & \selInfReadsOnPath          \\
+                              & \multicolumn{2}{l}{\mmio\ write addresses on path}  & \rpiInfWriteAddressesOnPath                 & \cmuInfWriteAddressesOnPath & \selInfWriteAddressesOnPath \\
+                              & \multicolumn{2}{l}{\mmio\ read addresses on path}   & \rpiInfReadAddressesOnPath                  & \cmuInfReadAddressesOnPath  & \selInfReadAddressesOnPath  \\
+                              & \multicolumn{2}{l}{Devices accessed}                & \rpiInfDevicesAccessed                      & \cmuInfDevicesAccessed      & \selInfDevicesAccessed      \\
+  % Fix to be just the peripherals
+  \multicolumn{3}{@{}l}{\emph{Peripheral synthesis}}                                                                                                                                                                            \\
+                              & \multicolumn{2}{l}{Wall-clock time}                 & \rpiSynthWallClockTime                      & \cmuSynthWallClockTime      & \selSynthWallClockTime      \\
+                              & \multicolumn{2}{l}{Total Symbolic Variables}        & \rpiSynthSymbolicVars                       & \cmuSynthSymbolicVars       & \selSynthSymbolicVars       \\
+                              & \multicolumn{2}{l}{Total Constraints}               & \rpiSynthTotalConstraints                   & \cmuSynthTotalConstraints   & \selSynthTotalConstraints   \\
+                              & \multicolumn{2}{l}{Constraints per variable}   & \rpiSynthAvgConstraints                     & \cmuSynthAvgConstraints     & \selSynthAvgConstraints     \\
+%                              & \multicolumn{2}{l}{Med. constraints per variable}   & \rpiSynthMedConstraints                     & \cmuSynthMedConstraints     & \selSynthMedConstraints     \\
+%                              & \multicolumn{2}{l}{Max. constraints per variable}   & \rpiSynthMaxConstraints                     & \cmuSynthMaxConstraints     & \selSynthMaxConstraints     \\
+                              & \multicolumn{2}{l}{Average trace length}               & \rpiSynthAvgTraceLen                        & \cmuSynthAvgTraceLen        & \selSynthAvgTraceLen        \\
+                              & \multicolumn{2}{l}{Median trace length}               & \rpiSynthMedTraceLen                        & \cmuSynthMedTraceLen        & \selSynthMedTraceLen        \\
+                              & \multicolumn{2}{l}{Maximum trace length}               & \rpiSynthMaxTraceLen                        & \cmuSynthMaxTraceLen        & \selSynthMaxTraceLen        \\
+  \multicolumn{3}{@{}l}{\emph{Emulator execution to goal}}                                                                                                                                                                      \\
+                              & \multicolumn{2}{l}{Wall-clock time}                 & \rpiEmuWallClockTime                        & \cmuEmuWallClockTime        & \selEmuWallClockTime        \\
+                              & \multicolumn{2}{l}{Total blocks executed}           & \rpiEmuTotalBlocks                          & \cmuEmuTotalBlocks          & \selEmuTotalBlocks          \\
+                              & \multicolumn{2}{l}{Unique blocks executed}          & \rpiEmuUniqueBlocks                         & \cmuEmuUniqueBlocks         & \selEmuUniqueBlocks         \\
+                              & \multicolumn{2}{l}{\mmio\ writes (ignored)}         & \rpiEmuWritesOnPath                         & \cmuEmuWritesOnPath         & \selEmuWritesOnPath         \\
+                              & \multicolumn{2}{l}{\mmio\ reads}                    & \rpiEmuReadsFromTrace                       & \cmuEmuReadsFromTrace       & \selEmuReadsFromTrace       \\
+                              & \multicolumn{2}{l}{\mmio\ write addresses}          & \rpiEmuWriteAddresses                       & \cmuEmuWriteAddresses       & \selEmuWriteAddresses       \\
+                              & \multicolumn{2}{l}{\mmio\ read addresses}           & \rpiEmuReadAddresses                        & \cmuEmuReadAddresses        & \selEmuReadAddresses        \\
+                              & \multicolumn{2}{l}{Devices accessed}                & \rpiEmuDevicesAccessed                      & \cmuEmuDevicesAccessed      & \selEmuDevicesAccessed      \\
+  \bottomrule
+\end{tabular}

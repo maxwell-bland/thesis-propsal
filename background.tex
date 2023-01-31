@@ -1,0 +1,119 @@
+\section{Background}
+This section addresses the necessary background to understand the methodologies present in Section~\ref{sec:methods}. 
+We begin by disucssing related work in firmware rehosting and the analysis of embedded systems.
+Following from this, there is a brief discussion of deredaction in the context of reverse engineering---primarily, the recovery of algorithms involved in the specification of PDF documents.
+Finally, we end with prior work in the verification and abstract interpretation of binary code semantics.
+
+\subsection{Firmware Rehosting and Analysis}
+
+The process of understanding or attacking a system like the Communication Management Unit of a Boeing 737 typically begins with the extraction of the firmware, or binary code, from hardware (flash units) storing this data, either via desoldering or via the use of wired connections~\cite{milburn2018there}.
+Once this code is extracted, it is typically brought into a decompiler, such as Ghidra~\cite{eagle2020ghidra}, which lifts the binary code back into a pseudo-C representation from an intermediate representation.
+This intermediate representation is typically a language with semantics that allow the decompiler to target diverse microarchitectures and allow algorithms operating on the intermediate representation to more easily perform decompilation~\cite{cifuentes1995decompilation}.
+The recovered pseudo-C representation may then be reverse engineered and experimented with by researchers to better understand how the firmware functions.
+
+However, the process of decompilation itself involves several concepts of importance to the proposed dissertations, and continues to be an active area of research~\cite{chen2019survey}.
+Of these, the proposed work focuses on \emph{abstract interpretation}, introduced by Cousot and Cousot around 1977~\cite{cousot1977abstract}, a model for the static analysis of programs by the construction or approximation of fixpoints, or lifting (microarchitectural) semantics from concrete to abstract domains.
+
+The abstract interpretation of binary programs has several equivalents, and has deeper ties into the notion of data-flow recovery and taint-tracking~\cite{schwartz2010all}.
+Abstract interpretation, when applied to binary code, is often referred to as symbolic execution, for which there are several notable systems, with more popular recent examples including KLEE and angr~\cite{cadar2008klee,wang2017angr}
+These systems often work by recording symbolic variants of concrete operations.
+For example, the statment $(x > 5) ?\ y + 1 : x + 1$ would be concretely evaluated to 4 if $x = 3$, however, under symbolic execution, the system will record the pair $(x<=5; x=x+1),(x>5;x=y+1)$ into a symbolic state, representing the two possible execution paths.
+A symbolic executor and other routines for static analysis are present in the Ghidra decompiler, in order to provide an accurate and reconfigurable reverse engineering and decompilation environment.
+
+\textbf{Emulation and Dynamic Analysis.} One reasonable next step, beyond the decompilation of the program, is to attempt to \emph{run} the program and analyze this execution, a subdomain referred to as dynamic analysis, introduced by Ball in 1999~\cite{ball1999concept}.
+For contexts in which the binary code under evaluation may be run on readily available hardware with the capability for instrumentation, it can be debugged, the execution may be traced and evaluated, or \emph{fuzzed}, inputs can be given to the system in an intelligent or random manner in order to fully evaluate the behavior of said system~\cite{li2018fuzzing}.
+
+However, it is often \emph{not} the case that a binary program can be executed in an environment that allows for instrumentation and dynamic analysis.
+Emulators, such as QEMU~\cite{bellard2005qemu}, attempt to correct for this by reproducing the context the original binary code was expecting to be emulated within, by simulating hardware interactions and by reinterpreting instructions into an microarchitecture-independent intermediate representation that may be executed on a virtual machine.
+
+\textbf{Rehosting.} The implementation of emulators is often an arduous process, involving careful study and a precise understand of the target system and hardware context. 
+The domain of \emph{firmware rehosting} attempts to automate this process, though various approaches.
+Both FIE~\cite{fie} and Jetset~\cite{johnson2021jetset} attempted to use a symbolic execution to bootstrap emulators for embedded firmware: they generate symbolic constraints for algorithms the firmware uses to interact with hardware, identify execution paths leading to a desired point in the firmware's execution, and then solve the constraint sets for that path in order to recover the precise memory reads necessary to trigger that path.
+Firmadyne~\cite{firmadyne} and Costin et al.~\cite{costin2014large, costin2016automated}, incontrast, attempted to just match the hardware interaction constraints of specific software, i.e. the Linux kernel and networking stacks.
+Pretender~\cite{pretender2019} attempted to rehost firmware by recording the interactions between the physical hardware and the firmware. 
+HALucinator~\cite{clementshalucinator} is a firmware rehosting tool that uses hueristics to locate the code belonging to the hardware abstraction layer (a vendor-provided API for interacting with the hardware) in the firmware and replace it with handlers that properly simulate the hardware interaction.
+P\textsuperscript{2}IM~\cite{p2im2020} performed fuzzing to identify the correct hardware read values necessary to trigger a particular program path. 
+
+The ultimate result of rehosting is, ideally, a system capable of executing the firmware and reproducing key system behaviors, e.g. a system that can be accurately fuzzed. 
+Such a digital twin is also useful in several contexts, including the generation of digital twin systems that replicate the functioning of a complex cyberphysical system and its environment in software.
+However, the domain still faces several challenges, including fidelity, firmware acquisition, static analysis for bootstrapping rehosting systems, parallelized emulation, and even after successful identification, vulnerability identification and integration of the emulation into other systems~\cite{wright2021challenges}.
+
+The proposed disseration will shed further light on the problem of rehosting introduced by these prior works, hinted at in the methodologies of Sec.~\ref{sec:methods}, and serve to further connect the problems of rehosting to the problems of abstract interpretation and meaning-making of binary codes in the presence of lost information (e.g. hardware components, symbols).
+
+\subsection{Deredaction and Information Leaks}
+Rehosting is related to deredaction in that both problems relate to the recovery of lost information.
+In the former case, the function of a system in an original, physical context, and in the latter, a removed text.
+To identify these parallels and better understand information loss, the proposed dissertation next addresses the problem of \emph{deredaction}, with particular focus on PDF text.
+
+When text is removed from a document in the classical sense, using a black marker or white-out, the width of the text is still observable given the surrounding words~\cite{egyptian}.
+Considering this alone as a \emph{perfect} process on a monospaced font, the words ``cat'' and ``dog'' become indistiguishable.
+However, the information loss is almost never perfect: for example, in Times New Roman, the words ``cat'' and ``dog'', if redacted, are distinguishable by their widths.
+Information leaks present in redacted PDF documents were identified by Lopresti and Spitz~\cite{lopresti2004quantifying}, who developed a system for breaking redactions where the precise TTF width was known.
+
+However, the Lopresti and Spitz work ended up failing to account for several important aspect of the problem: first that a rasterization workflow may change a PDF document's glyph positioning and physical printing may not be a pixel-perfect reproduction of the digital document, and second, that TTF glyph widths do not necessarily equate with PDF document or raster glyph widths.
+Moreover, they missed an additional, severe facet of the problem: that in PDF documents, width alone was not being leaked: there are also sub-pixel sized shifts applied to non-redacted glyphs that can be \emph{dependent} on redacted glyphs' data.
+This was the subject of \emph{Story Beyond the Eye}, a work narrativized by the proposed dissertation~\cite{bland2022story}.
+
+It is useful to consider, then, the two failures of information recovery, both unknown unknowns and unknown knowns, cases where a leak of aspect of information is not captured and cases where it is misinterpreted~\cite{vzivzek2004rumsfeld}.
+Thus, there is a wealth of literature on the improper removal of information from digital files that follows this pattern, and \emph{Story Beyond the Eye} also, understandably, only partially solves the problem.
+Forrester and Irwin~\cite{forrester2005investigation} discuss nonexcising redactions and unscrubbed metadata such as the Producer field of PDF documents but do not mention glyph positioning based deredaction.
+Hill et al., used hidden Markov models to recover text obscured either by mosaic pixelization or a related tactic, e.g. Gaussian Blur~\cite{hill2016effectiveness}, but fail to deredact text obscured by a single box.
+While M{\"u}ller et al.~\cite{muller2021processing} discuss hidden information present in PDF documents, specifically PDF document revision information and author name metadata, but do not explicitly tackle redaction.
+Other file formats may also be deredacted: Murdoch and Dornseif~\cite{murdochmisc} discuss how cropped JPEGs can preserve uncropped image information, but these works do not dicuss text redaction in particular.
+
+Irrespective of the studied medium (PDF redaction, JPEG redaction) information left or destroyed is always a result of a communication system~\cite{ash2012information}, and in most cases this data flow is determined by a software system---by binary code interpreting binary code.
+Thus the proposed dissertation will highlight a portion of \emph{Story Beyond the Eye} not discussed in the publication, the extraction of exact models of PDF text positioning algorithms from closed-source software.
+
+\subsection{Function Summarization and Code Lifting}
+
+Naturally, as a result of similar problems to those encountered in \emph{Story Beyond the Eye}, there is a wealth of research on the subject of \emph{function summarization} and lifting of firmware binaries, particularly within the software verification and reverse engineering communities.
+The immediate form of this problem is software clone identification, which attempts to find identical program slices across binaries~\cite{zhang2021survey}, while the theoretical landscape stretches to the generation of a precise abstract interpreter from a system of logic~\cite{thakurR12}.
+\emph{Function summarization} is defined as follows~\cite{interpolation}:
+
+\emph{Let $f$ be a function, $v$ a bound on the number of unrolled loops and recursive calls, $R_{v}^{f}$ a set of tuples of computations in $f$ over $v$, $\mathbb{D}$ a domain function mapping from inputs to outputs of $f$, then $S$ s.t. $R_{v}^{f} \subseteq S \subseteq \mathbb{D}$ is a summary of $f$.}
+
+The necessity of loop unrolling here is somewhat strict and can be replaced by inferred invariants~\cite{furia2014loop}.
+\emph{Binary lifting} raises machine instructions to higher-level intermediate representations (IR) such as LLVM~\cite{anand2013compiler,di2017rev,dinaburg2014mcsema}.
+The value provided by summarization and lifting is the precise association and identification of useful information within a binary program.
+
+The final work the proposed dissertation integrates, InteGreat~\cite{bland2023integreat}, reinterprets bitvector-domain symbolic execution into the theory of uninterpreted functions to perform modular, nestable function summarization and decompilation.
+It provides a specification language that allows users to abstract arbitrary program slices in symbol-stripped binary code with symbols and statements in systems of logic.
+
+A long line of work has utilized symbolic execution to perform model extraction and subsequently verification on the extracted models.
+SPIN~\cite{spin}, defined the term ``model extraction'' and applied model-checking on aero-space flight software.
+Babi\'c and Hu~\cite{babic2007structural} used natural abstraction boundary identification and symbolic execution to optimize the performance of verification.
+Hernandez et al.~\cite{firmusb} and~\cite{cryto-symex} used symbolic execution to extract and verify protocol models.
+The same authors also noted the importance of rounding the floating-point precision error on verifying their extracted models in~\cite{precision}.
+Jackson and Woodward~\cite{lightweight-oo} extracted object-oriented (OO) models from Java bytecode,~\cite{oo-model} extracted OO data models from weakly-typed source code. 
+Bandera~\cite{tool-supported-program-abstraction} is a tool for user-guided extraction of finite-state automata from Java programs, however, the tool requires access to source code, and focuses on abstracting single variables rather than program slices.
+While these techniques could improve InteGreat, prior work does not address the possibility of a generic language for the specification of these abstraction extraction boundaries, and does not solve the specific problems involved in stiching together uninterpreted functions as abstractions.
+
+Ji et al.~\cite{transformation} perform backward application of extended sequent calculus rules on symbolic expression trees.
+InteGreat's approach, abstraction resolution, is similar to a sequent calculus approach.
+However, this work symbolically executes by sequent calculus rules and does not attempt summarization. 
+Instead, the goal of the work is bisimulation and optimization of the analyzed algorithms.
+
+The closest work to InteGreat is Currie et al.~\cite{currie2006embedded}. 
+Currie et al. \emph{only} consider the problem of equivalent programs across compiler optimizations, and do not use uninterpreted functions to target \emph{decompilation}, only to check equality.
+This is a stictly easier problem than the one we solve, because we address the necessity of retaining viable semantics before and after skipping a program slice (by identifying side-effects of the removed slice automatically).
+
+The proposed dissertation will offer greater technical explanations of the core algorithms used by InteGreat and analyze the relationship between this work and that of Jetset and \emph{Story Beyond the Eye}.
+It will consider how the sound substitution of a program slice's semantics via abstract interpretation, the core technical feat of InteGreat, relates to the process of information loss in transformations of digital data.
+In particular, by presenting InteGreat's use of deductive specifications in the problem of abstraction, the paper will present one perspective on the nature of information loss in digital systems.
+
+\subsection{Goals}
+
+The goal of the dissertation will be to synthesize works spanning the prior five years and three domains: rehosting, redaction (information loss), and lifting, into a commentary and perspective on binary program analysis.
+Moreover, the work will compose the empirical evidence necessary to make progress on the problem of precisely identifying when a particular piece of information is or is not recoverable from a compiled, symbol-stripped binary.
+
+Therefore, unresolved domains of the work will be cases where the binary code under evaluation is not related to either an embedded system, a digital document, or a control equation that may be more readily abstracted than arbitrary computation.
+The remaining focus is not total but remains sufficient to justify the labor of a unified narrative.
+
+\emph{Remaining Problems.} Because this dissertation will draw conclusions from published work and work in submission, it will only include novel experiments insofar as is necessary to justify claims made in the content of the dissertation, where existing empirical evidence will not suffice.
+The nature of these experiments and claims, due to realistic limitations on the grounds with which they may be justified, will be intimately related to the theoretical and real capacities of Jetset, \emph{Story Beyond the Eye}, and InteGreat.
+Where appropriate the proposed dissertation will detail future work \emph{specific to the subdomain} of each work.
+
+To provide a listing of just a few such specific future works, this includes, for example, limitations on the capabilities of existing symbolic executors to control the state space explosion encountered when attempting to interpret loops. 
+It also includes difficulties in resolving pointer aliasing in symbol-stripped firmware, and lack of support within current symbolic executors for detailed support of extra-assembly semantics, such as task switching and interrupts. 
+For redaction, it includes issues relating to the resolution of precise glyph shifting schemes used within printed or rasterized documents, the implementation or recovery of additional glyph shifting schemes, and the generic tracing of specific PDF production workflows.
+With respect to the InteGreat work, this includes mathematical abstractions for guaranteeing the correctness of transformations between one semantic domain and an arbitrary, more abstract domain, and subsidiary issues, such as the perfect identification of a given target semantics within a symbol-stripped binary program.
