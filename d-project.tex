@@ -150,7 +150,7 @@ The work also included an extensive notification of affected parties, demonstrat
 
 \begin{figure}[h!]
 \centering
-\includegraphics[width=2.75in]{tj.pdf}
+\includegraphics[width=2in]{tj.pdf}
     \caption{The TJ text showing operator, which specifies the glyphs to render and, by reference to a font object (not shown), their widths, along with any associated positional adjustments, given in text space units.}\label{fig:tj}
 \end{figure}
 
@@ -323,7 +323,7 @@ A real-world redaction was evaluated if either:
 \small\input{wild-res}
 \end{table}
 
-While limited by the technical complexity of precisely modeling a single glyph shifting scheme, the resulting evaluation broke hundreds of redactions in real world documents. 
+The resulting evaluation broke hundreds of redactions in real world documents. 
 The results of this are reported in Table~\ref{tab:wildres}.
 It is important to note the definition of \emph{broke}: the FN$\times$LN dictionary contained $1.5 \times 10^{10}$ entries, so a reduction to a few hundred or thousands possibilities is significant.
 We confirmed with affected parties that often the feasible dictionary is much smaller, and the results for $FNLN$ in Table~\ref{tab:nyt10} emphasize the attack is dangerous.
@@ -331,9 +331,22 @@ Many additional verifications of these findings were performed but are omitted f
 
 \subsubsection{Discussion}
 
+Due to the complex technical matter of deredaction and methodological novelties in the evaluation of deredaction attacks, the publication did not include, sufficiently, a description of two facets of deredaction that are as essential as a robust empirical evaluation.
+First, the extraction of glyph shiftng schemes from Microsoft Work, Adobe Acrobat, and other systems was non-trivial.
+Moreover, the present author performed this extraction and modeling by hand, a problem largely solved by the InteGreat tool, presented next.
+
+One important feature of these algorithms was their dependence on floating point error: they could not be lifted to continuous equations without resulting in an incorrect representation.
+This is deeply related to the assumptions made in the InteGreat work, which ignores floating point error when lifting continuous control equations from binary firmware for the purposes of verification.
+Clearly there are domains wherein this floating point error is and is not \emph{useful}, and the proposed dissertation will address this problem in a greater depth by contrasting the two works, something the works, independently considered, could not discuss.
+
+The other key success (and limitation) of \emph{Story Beyond the Eye} was the paper's treatment of the unknown: deredaction may never be considered as determining the correct redacted text, but only as ruling out possibilities with the assumption that the observed evidence is complete, correct, and correctly understood.
+The paper also highlights important notions core to the use of leaked or remaining information after information destruction (redaction) occurs, most notably the notion of a \emph{prior}, provided by a dictionary.
+These ideas are, to the present author's knowledge, hardly discussed in the context of lifting and binary program analysis, and both the Jetset and InteGreat works would have benefitted from a richer comprehension of this facet of information loss.
+The proposed dissertation will more closely consider the role that prior information may play in the domains of firmware rehosting and continuous equation lifting.
+
 \subsection{InteGreat}
 
-InteGreat reinterprets bitvector-domain symbolic execution of program slices into the theory of uninterpreted functions to perform modular, nestable function summarization and decompilation.
+InteGreat reinterprets bitvector-domain symbolic execution of program slices into the theory of uninterpreted functions to perform modular, nestable function summarization and lifting.
 The tool provides researchers with a novel design language for automatically abstracting complex programs into mathematical equations.
 In the submitted publication, InteGreat's lifting was used to determine the sensor inputs necessary to precisely destabilize the reactor pressure of a chemical plant, discover novel problems in the domain of firmware rehosting, and discover a flaw in the implemented version of a published quad-copter stabilization algorithm.
 
