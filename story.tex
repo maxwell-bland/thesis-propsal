@@ -1,0 +1,205 @@
+\subsection{Story Beyond the Eye}
+
+In \emph{Story Beyond the Eye} we found that many current redactions of PDF text are insecure due to non-redacted character positioning information, determined by the \emph{glyph shifting} algorithms PDF producers use.
+Subpixel-sized horizontal shifts in redacted and non-redacted characters can be recovered and used to effectively \emph{deredact} first and last names---these shifts add additional information to the width of redacted information and can be dependent upon redacted information but not themselves redacted.
+These findings affected redactions where the text underneath the black box is removed from the PDF.
+
+The system uses models of glyph shifting algorithms to correctly fingerprint the information left by redacted text, and was able to ``break'' hundreds of real-world PDF redactions, including in documents of historical relevance, OIG investigation reports, and FOIA responses.
+The work also included an extensive notification of affected parties, demonstrating the broad impact of the work.
+
+\subsubsection{Techniques}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=2in]{tj.pdf}
+    \caption{The TJ text showing operator, which specifies the glyphs to render and, by reference to a font object (not shown), their widths, along with any associated positional adjustments, given in text space units.}\label{fig:tj}
+\end{figure}
+
+The significant discovery of \emph{Story Beyond the Eye} was the existence and utilization of a novel redacted text information leak.
+PDF documents can render text in numerous ways, including by use of a text showing operator, one of which (TJ) is depicted in Figure~\ref{fig:tj}. 
+The TJ operator takes as arguments a string of text and a vector of \emph{positional adjustments} which displace the character with respect to a default position. 
+This default position is usually a fixed offset from the previous character equivalent to the \emph{advance width} of the previous character defined elsewhere in the PDF document.
+
+Glyph advance widths and glyph shifts create a security concern, and \emph{Story Beyond the Eye} found that most PDF redaction tools replace text selected for redaction with a single large shift of the same width as the redacted text showing operator, creating the two significant security risks:
+\begin{itemize}
+	\item The precise width of the redaction can be used to eliminate potential redacted texts, and is made more distinct than advance widths alone by glyph shifts.
+	\item Any non-redacted glyph shifts conditioned on redacted glyphs can be used to eliminate potential redacted texts.
+\end{itemize}
+The work also addressed concerns related to nonexcising redactions. 
+These redactions are cases where the text underneath the redaction can be selected and copied to the system clipboard from the PDF document.
+
+Glyph shifts may then be classified as \emph{independent} or \emph{dependent}, where the former implies they are not determined by any particular character in the document, and the latter implies that they are---this is precisely dangerous if the character they are conditioned on is redacted.
+This itself is not dangerous if the amount of information leaked on redacted text is small or the redaction tools themselves remove this information.
+Thus, the methodology of the paper was split into extracting and evaluating glyph shifting schemes, e.g. from Microsoft Word's ``Save-as-PDF'' feature, and evaluating the information removed by redaction tools.
+
+The latter corresponded to an evaluation of what types of information the redaction tools leaked, and after reverse engineering the schemes produced by 11 redaction tools, including Adobe Acrobat, the paper finds \emph{none} but those that rasterize the document entirely sufficiently mitigate these leaks.
+Two of the tools were completely broken, and did not remove the text at all (created nonexcising redactions): the present author notified them of this problem and as a result of this both the tools have published patches.
+
+\lstset{ %
+language=C++,                % choose the language of the code
+basicstyle=\ttfamily\footnotesize,       % the size of the fonts that are used for the code
+numbers=left,                   % where to put the line-numbers
+numberstyle=\footnotesize,      % the size of the fonts that are used for the line-numbers
+stepnumber=1,                   % the step between two line-numbers. If it is 1 each line will be numbered
+numbersep=5pt,                  % how far the line-numbers are from the code
+backgroundcolor=\color{white},  % choose the background color. You must add \usepackage{color}
+showspaces=false,               % show spaces adding particular underscores
+showstringspaces=false,         % underline spaces within strings
+showtabs=false,                 % show tabs within strings adding particular underscores
+frame=single,           % adds a frame around the code
+tabsize=2,          % sets default tabsize to 2 spaces
+captionpos=b,           % sets the caption-position to bottom
+breaklines=true,        % sets automatic line breaking
+breakatwhitespace=false,    % sets if automatic breaks should only happen at whitespace
+escapeinside={\%*}{*)}          % if you want to add a comment within your code
+}
+
+\begin{figure}
+\begin{lstlisting}
+for (int j = i + 1; j < vs->size(); j++) {
+    t = ttfScaledWidths[j] / 1000;
+    d = internalMSWordWidths[j] / internalMSWordFontSize;
+    ttf += t;
+    msWord += d;
+    disp = ttf - msWord;
+    if (((disp > 0.003) || (disp < -0.003)) && i != vs->size() - 1) {
+      int adj = disp * 1000 + 0.5;
+      vs->setShift(j, adj);
+      ttf = msWord = 0;
+    } else {
+      vs->setShift(j, 0);
+    }
+}
+\end{lstlisting}
+\caption{Snippet of reverse engineered code representing how Microsoft Word leaks redacted character information into non-redacted characters in a PDF document.
+    }
+\label{fig:msword-snippet}
+\end{figure}
+
+The extraction and evaluation of the glyph shifting schemes involved precise tracing of PDF producer software and reverse engineering to extract an exact model of their positioning algorithms for text. 
+Microsoft Word, in particular, provided glyph shift values that were \emph{highly} dependent on redacted glyphs, due to a floating-point error accumulation algorithm that compares the ``real'' PDF position of a glyph with a set of artificial positions determined by the full text of a given line.
+A portion of this behavior, one of the error accumulators, is presented in Fig.~\ref{fig:msword-snippet}.
+Note the internal widths used on line 3 of the figure are determined by a loop with no overflow reset and the redacted information held by the accumulator is not zero after a single shift is written: this detail is given in the publication's appendix.
+
+The extraction of the prior algoithm and reverse engineering of PDF producer structures in a rich area and was not given sufficient space due to constraints on the original publication.
+The proposed dissertation would provide both an explanation of how these algorithms were extracted as well as some of the challenges and solutions developed when addressing the problems of discovering and breaking redactions, and classifying glyph shifting schemes.
+
+\subsubsection{Evaluation}
+
+\paragraph{Synthetic Evaluation.}
+The evaluation of the vulnerability these shifting schemes create for redacted text was based on the simulation of redactions on text from the New York Times annotated corpus~\cite{nytCorp} using various \emph{dictionaries}.
+This represents how the amount of information leaked depends on prior information about the redacted text. 
+For example, if we know the redacted text is one of 151,671 American surnames, then this redaction leaks at most $log_{2}(151, 671) \approx 17.2$ bits. 
+Notably, these dictionaries included:
+
+\input{defs}
+
+\begin{itemize}[nosep]
+\item\textit{Str.} All strings of 3--16 characters in length starting with a uppercase or lowercase letter followed by lowercase letters.
+\item\textit{Acrn.} All strings of 2--5 uppercase characters.
+% \item\textit{Pron.} English third-person pronouns which are often redacted to avoid revealing a person's gender.
+\item\textit{Word.} English words including some proper nouns.
+\item\textit{Ctry.} Official and common names of countries.
+\item\textit{Rgn.} Names of regions, a superset of \emph{Ctry}.
+\item\textit{Natl.} Nationalities, demonyms, and adjectives of regions and nationalities, sourced from lists on Wikipedia.
+\item\textit{FN.} American given (first) names.
+\item\textit{LN.} American surnames (last names).
+\item\textit{FI$\times$LN.} All combinations of a name initial followed by surname (\emph{LN}).
+\item\textit{FN$\times$LN.} All combinations of a given name (\emph{FN}) followed by a surname (\emph{LN}).
+\item\textit{FNLN and FILN.} \emph{FN$\times$LN} and \emph{FI$\times$LN} filtered to only include combinations of name and surname that appear in the voter registration databases of the three US states.
+    North Carolina~\cite{ncVoterData}, Ohio~\cite{ohVoterData}, and Washington~\cite{waVoterData} were chosen based upon the availability of publicly accessible data.
+\end{itemize}
+
+\begin{table}
+\centering
+\caption{
+    Dictionaries containing candidate texts used for evaluating deredaction. 
+    Stop words are excluded from the statistics.
+}\label{tab:dicts}
+\small\input{dicts}
+\end{table}
+
+The amount of information leaked in the simulated redaction was measured both upon a uniform ($H_{u}(X)$) and empirical ($H_{e}(X)$) frequency distribution of each dictionary entry, i.e. one wherein the adversary knows which dictionary entries are more likely to occur and one wherein they treat each dictionary entry as equally possible.
+It is therefore important to understand the size of these dictionaries and the number of bits of information they contain \emph{in total} with respect to both uniform and empirical distributions, so that the following synthetic evaluation results may be placed in context.
+Scale measurements are given in Table~\ref{tab:dicts}.
+
+\begin{table*}
+\centering\small
+\caption{Number of bits leaked (left) and probability of a correct guess (right) for different shifting schemes in simulated redactions of the NYT corpus set in 10pt font.
+    Refer to Table~\ref{tab:dicts} for the total number of bits of information present in the candidate dictionary.
+    ``Probability correct guess'' refers to the likelihood of randomly selecting the redacted word given the (typically small) set of matching candidate texts.
+    }
+\label{tab:nyt10}
+\input{nyt10}
+\end{table*}
+
+The results of this synthetic evaluation are given in Table~\ref{tab:nyt10}.
+Note that four different fonts and three glyph shifting schemes were evaluated: Courier presents a strawman result for a purely monospaced font with no shifts.
+The \emph{Un} column presents the efficacy of deredaction provided an attack utilizing the width of the PDF text alone, if no adjustments occur.
+This is a specific case of an \emph{independent} shifting scheme.
+The \emph{W07} and \emph{W19} columns present the Microsoft Word shifting schemes in the 2007 and 2019 desktop versions of Microsoft Word.
+These, in turn, depict changes in the algorithm over time and highlight the historical significance of the attack, as it has been possible in documents over the range of at least a decade.
+
+\paragraph{Real Evaluation.}
+The present author also evaluated the extent of information leaks in real documents, using the following corpora, which were attained using a combination of webscraping and redaction location algorithms.
+The latter were custom-made, and included separate algorithms for excising and nonexcising redactions.
+Both were constructed to identify single-color boxes in-between and on top of text, respectively.
+
+\begin{enumerate}
+    \item \emph{FOIA.} Documents obtained via the US Freedom of Information Act (FOIA) on governmentattic.org~\cite{govattic}. 
+This corpus provides us with independently selected documents with some public interest.
+    \item \emph{OIG.} Office of the Inspector General (OIG) reports hosted by oversight.gov~\cite{oigReports}. 
+The OIG is a US Government oversight branch tasked with preventing unlawful operation of other government branches.
+This corpus allowed us to measure the impact deredaction may have on documents from a high-profile and large organization.
+    \item \emph{DNSA.} Digital National Security Archive (DNSA) documents produced after 2010~\cite{dnsaSite}. 
+The DNSA is a set of historical US government documents curated by scholars. 
+That is, we found redaction information leaks affect significant historical documents.
+    \item \emph{RECAP.} CourtListener's RECAP court document archive.
+RECAP mirrors PACER, the US Federal Courts' docketing system~\cite{pacerSite}, and contains over 10 million documents.
+We use RECAP to measure the impact of nonexcising redactions (discussed below).
+    \item \emph{rRECAP} the subset of RECAP documents returned for the search string ``redacted''.
+We chose to include rRECAP because running the excising redaction location algorithm mentioned in on the entire RECAP corpus would be both computationally and financially prohibitive.
+\end{enumerate}
+
+Only the RECAP corpus contained nonexcising redactions and our results for this corpus were reported with respect to nonexcising redactions.
+Our results for all other corpora were reported with respect to excising redactions.
+
+In this evaluation it was necessary to correctly infer the specific glyph shifting scheme of each document and whether that document was vulnerable, thus a framework for classifying a redaction was developed.
+This framework included the additional constraint that the redaction could be reasonably classified as a name, in order to reduce the false positives rate created by attempting deredaction on entries outside the evaluated dictionary, FN$\times$LN.
+A real-world redaction was evaluated if either:
+\begin{enumerate}[nosep]
+    \item The redacted text is present in the PDF (vulnerable to copy-paste attack); or
+    \item The redacted text is not present, but the document retains glyph shifting scheme information where:
+        \begin{itemize}[nosep]
+            \item The scheme matches a Word ``Save as PDF'' shifting scheme,
+            \item The redaction appears to be a name, e.g. ``Jane'', and
+            \item The redaction is the first from left to right on the line of text.
+        \end{itemize}
+\end{enumerate}
+
+\begin{table}
+  \centering
+    \caption{Top: Glyph shifting schemes identified in redacted corpora pages. Bottom: Deredaction results for names tagged.}
+\label{tab:wildres}
+\small\input{wild-res}
+\end{table}
+
+The resulting evaluation broke hundreds of redactions in real world documents. 
+The results of this are reported in Table~\ref{tab:wildres}.
+It is important to note the definition of \emph{broke}: the FN$\times$LN dictionary contained $1.5 \times 10^{10}$ entries, so a reduction to a few hundred or thousands possibilities is significant.
+We confirmed with affected parties that often the feasible dictionary is much smaller, and the results for $FNLN$ in Table~\ref{tab:nyt10} emphasize the attack is dangerous.
+Many additional verifications of these findings were performed but are omitted from this proposal due to space constraints.
+
+\subsubsection{Discussion}
+
+Due to the complex technical matter of deredaction and methodological novelties in the evaluation of deredaction attacks, the original publication did not include a description of technical facets of modeling glyph shifting schemes that are essential to correct deredaction.
+The extraction of glyph shiftng schemes from Microsoft Work, Adobe Acrobat, and other systems was non-trivial and the present author was forced to perform this modeling and reverse engineering largely manually.
+
+One important feature of these algorithms was their dependence on floating point error: they could not be lifted to continuous equations without resulting in an incorrect representation.
+This is deeply related to the assumptions made in the InteGreat work, which ignores floating point error when lifting continuous control equations from binary firmware for the purposes of verification.
+Clearly there are domains wherein this floating point error is and is not \emph{useful}, and the proposed dissertation will address this problem in a greater depth by contrasting the two works, something the works, independently considered, could not discuss.
+
+The other key success (and limitation) of \emph{Story Beyond the Eye} was the paper's treatment of the unknown: deredaction may never be considered as determining the correct redacted text, but only as ruling out possibilities with the assumption that the observed evidence is complete, correct, and correctly understood.
+The paper also highlights important notions core to the use of leaked or remaining information after information destruction (redaction) occurs, most notably the notion of a \emph{prior}, provided by a dictionary.
+These ideas are, to the present author's knowledge, hardly discussed in the context of lifting and binary program analysis, and both the Jetset and InteGreat works would have benefitted from a richer comprehension of this facet of information loss.
+The proposed dissertation will more closely consider the role that prior information may play in the domains of firmware rehosting and continuous equation lifting.

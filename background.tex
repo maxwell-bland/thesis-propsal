@@ -54,8 +54,8 @@ However, the Lopresti and Spitz work ended up failing to account for several imp
 Moreover, they missed an additional, severe facet of the problem: that in PDF documents, width alone was not being leaked: there are also sub-pixel sized shifts applied to non-redacted glyphs that can be \emph{dependent} on redacted glyphs' data.
 This was the subject of \emph{Story Beyond the Eye}, a work narrativized by the proposed dissertation~\cite{bland2022story}.
 
-It is useful to consider, then, the two failures of information recovery, both unknown unknowns and unknown knowns, cases where a leak of aspect of information is not captured and cases where it is misinterpreted~\cite{vzivzek2004rumsfeld}.
-Thus, there is a wealth of literature on the improper removal of information from digital files that follows this pattern, and \emph{Story Beyond the Eye} also, understandably, only partially solves the problem.
+It is useful to consider, then, cases where an information leak is not captured and cases where it is misinterpreted.
+There is a wealth of literature on the improper removal of information from digital files that follows this pattern, and \emph{Story Beyond the Eye} also, understandably, only partially solves the problem.
 Forrester and Irwin~\cite{forrester2005investigation} discuss nonexcising redactions and unscrubbed metadata such as the Producer field of PDF documents but do not mention glyph positioning based deredaction.
 Hill et al., used hidden Markov models to recover text obscured either by mosaic pixelization or a related tactic, e.g. Gaussian Blur~\cite{hill2016effectiveness}, but fail to deredact text obscured by a single box.
 While M{\"u}ller et al.~\cite{muller2021processing} discuss hidden information present in PDF documents, specifically PDF document revision information and author name metadata, but do not explicitly tackle redaction.
@@ -65,8 +65,9 @@ Irrespective of the studied medium (PDF redaction, JPEG redaction) information l
 Thus the proposed dissertation will highlight a portion of \emph{Story Beyond the Eye} not discussed in the publication, the extraction of exact models of PDF text positioning algorithms from closed-source software.
 
 \subsection{Function Summarization and Code Lifting}
+\label{sec:func-summarization}
 
-Naturally, as a result of similar problems to those encountered in \emph{Story Beyond the Eye}, there is a wealth of research on the subject of \emph{function summarization} and lifting of firmware binaries, particularly within the software verification and reverse engineering communities.
+As a result of similar problems to those encountered in \emph{Story Beyond the Eye}, there is a wealth of research on the subject of \emph{function summarization} and lifting of firmware binaries, particularly within the software verification and reverse engineering communities.
 The immediate form of this problem is software clone identification, which attempts to find identical program slices across binaries~\cite{zhang2021survey}, while the theoretical landscape stretches to the generation of a precise abstract interpreter from a system of logic~\cite{thakurR12}.
 \emph{Function summarization} is defined as follows~\cite{interpolation}:
 
@@ -101,15 +102,10 @@ The proposed dissertation will offer greater technical explanations of the core 
 It will consider how the sound substitution of a program slice's semantics via abstract interpretation, the core technical feat of InteGreat, relates to the process of information loss in transformations of digital data.
 In particular, by presenting InteGreat's use of deductive specifications in the problem of abstraction, the paper will present one perspective on the nature of information loss in digital systems.
 
-\subsection{Goals}
+\subsection{Remaining Problems}
 
-The goal of the dissertation will be to synthesize works spanning the prior five years and three domains: rehosting, redaction (information loss), and lifting, into a commentary and perspective on binary program analysis.
-Moreover, the work will compose the empirical evidence necessary to make progress on the problem of precisely identifying when a particular piece of information is or is not recoverable from a compiled, symbol-stripped binary.
-
-Therefore, unresolved domains of the work will be cases where the binary code under evaluation is not related to either an embedded system, a digital document, or a control equation that may be more readily abstracted than arbitrary computation.
-The remaining focus is not total but remains sufficient to justify the labor of a unified narrative.
-
-\emph{Remaining Problems.} Because this dissertation will draw conclusions from published work and work in submission, it will only include novel experiments insofar as is necessary to justify claims made in the content of the dissertation, where existing empirical evidence will not suffice.
+Because this dissertation will draw conclusions from published work and work in submission, it will only include novel experiments insofar as is necessary to justify claims made in the content of the dissertation, where existing empirical evidence will not suffice.
+Unresolved domains of the proposed dissertation will include cases where the binary code under evaluation is not related to either an embedded system, a digital document, or a control equation that may be more readily abstracted than arbitrary computation.
 The nature of these experiments and claims, due to realistic limitations on the grounds with which they may be justified, will be intimately related to the theoretical and real capacities of Jetset, \emph{Story Beyond the Eye}, and InteGreat.
 Where appropriate the proposed dissertation will detail future work \emph{specific to the subdomain} of each work.
 

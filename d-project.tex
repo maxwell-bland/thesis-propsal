@@ -36,357 +36,36 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Section 3: Research Plan   %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Research Methodology}
-\label{sec:methods}
+\input{methodology}
 
-The following section introduces the methodologies and technical contributions of the Jetset, \emph{Story Beyond the Eye}, and InteGreat works.
-In each subsection, an overview of the work is provided and then followed by an explanation of the specific technical contributions the dissertation will expand upon and discuss.
+\section{Conclusion}
 
-\subsection{Jetset}
+These three works, Jetset, \emph{Story Beyond the Eye}, and InteGreat, present three novel perspectives on the recovery of models from binary code.
+In the first, the models were expression sets corresponding to the constraints of hardware peripheral interactions.
+The second involved the more complex extraction and hand-modeling of glyph shifting schemes used to determine the information leaked by redacted text.
+Finally, the third presented a more formal and sophisticated model for the extraction of meaningful abstractions from symbol-stripped, binary code.
 
-The Jetset system uses symbolic execution to infer what behavior firmware expects from a target hardware device.
-It recovers traces of the expected I/O behavior, and then generates device models for hardware peripherals in C, allowing the an analyst to boot the firmware in an emulator.
-Jetset was applied to 13 firmware images, the most complex of which were a Feeder Protection Relay, the Communication Management Unit of a Boeing 737, and a Raspberry Pi.
-The emulated firmware image also facilitates fuzz-testing, and a custom, architecture-independent fuzzer for QEMU, requiring no firmware modification, was used to discover a previously unknown privilege escalation vulnerability.
+As a whole, these works indicate a number of hard problems in the domain of binary program analysis, including the resolution and modeling of precise, discrete floating point operations and their relationship to the real domain, the ability to avoid difficulties incurred in developing a general solution to the halting problem through the use of abstraction, and the impossibility of perfectly rehosting a firmware image into an emulator and accurately interacting with it without \emph{some} knowledge of physical factors and additional hardware that plays a role in the system.
 
-\subsubsection{Techniques}
-
-The core of Jetset is composed into three parts: \emph{specification}, \emph{peripheral inference and synthesis} and \emph{search strategy}. 
-
-The \emph{specification} fed to Jetset consists of four parts, which must be attained via alternative means.
-\begin{itemize}
-	\item The \textbf{binary code} of the target, which must be read out of a physical flash or extracted from the target by some other means.
-	\item The \textbf{memory layout} of the target, which specifies how physical devices are mapped into the memory of the device, and is used to determine which reads and writes are key to peripheral inference.
-	\item The \textbf{entry point} of the target, e.g. where execution begins. In this sense, Jetset attempts a \emph{brute force} inference of the target, by beginning inference from the absolute start of execution. This stands in contrast to InteGreat, discussed later.
-	\item A \textbf{goal address} to reach within the target. Jetset explores \emph{a single} execution path to a specific firmware state, and employs a \emph{single} search strategy to get to this target. This again will stand in contrast to InteGreat.
-\end{itemize}
-
-This specification is then used to begin the process of \emph{peripheral inference and synthesis}, the former of which consists of symbolically executing the firmware to infer what values should be returned by reads from device registers.
-The symbolic execution uses a taint-tracking system build on top of the QEMU TCG intermediate representation, paired with the angr constraint solver, to determine which read values are necessary to achieve a particular execution trace.
-This union between taint tracking and symbolic execution was noted in~\cite{schwartz2010all}.
-
-Importantly, work in this domain, including the famous SymQEMU~\cite{poeplau2021symqemu} and Jetset, ignore the necessity of symbolically executing the hundreds of TCG helper methods essential to QEMU~\cite{tcghelper}, which capture important microarchitectural operations, even as simple as branches, by directly modifying QEMU's state rather than by executing a TCG IR operation.
-Thus, both Jetset and SymQEMU fail to account for significant microarchitectural semantics that are necessary for the soundness of the systems in the general case, even if they work on the evaluation targets persent in their publications.
-\emph{Any} work based upon the TCG IR alone that does not address the helper methods will be unsound.
-InteGreat addresses this problem with zero-length program slices that \emph{could} contain the semantics of TCG helper methods, though the goal of this paper is to provide a more general interface to some of the key problems of symbolic execution, rather than problems encountered when using QEMU.
-
-The synthesis stage for peripherals recovers the specific model by making a call into angr's wrapper around the Z3 solver to find a concrete value that satisfies the constraints necessary to execute the desired program path.
-
-\begin{figure}
-\centering
-%\includegraphics[width=8cm]{diagrams/distance_func.png}
-\input{distance_func}
-\caption{Context-sensitive distance from statement 5 (in first \texttt{foo} call) to statement 7 (of second \texttt{foo} call).}
-\label{fig:distance_func}
-\end{figure}
-
-For the purposes of finding a goal location in the firmware, Jetset naively applies just a single \emph{search strategy} to locate a target execution point, a combination of Tabu search, a variation of depth-first search guided by a distance function with a list of ``avoid'' states and a context-sensitive distance function generated by resolving the callgraph of dynamically resolved function calls during symbolic execution.
-The latter is achieved by ``stitching'' the discovered call target address during the symbolic execution into the recovered control flow graph so far.
-An overview of this process is given in Fig.~\ref{fig:distance_func}.
-
-By adding the context of the child-call CFG as calls are resolved at runtime, Jetset takes into account the fact that the distance between two instructions in a program can depend on the calling context, i.e. the call-stack of the two instructions.
-Because programs may modify their own callstack to perform returns to different locations, distance from the goal location is computed lazily from the actual stack during execution.
-
-When Jetset is not able to resolve a path to the target due to indirect or runtime-calculated function pointers, it alternates between resolving branches as \emph{true} or \emph{false}, allowing it to escape from exploring the same loop resolution condition infinitely.
-
-\subsubsection{Methodology}
-
-\input{data}
-
-\begin{table*}
-\small
-\centering
-\caption{Evaluation targets and summary statistics.}
-\label{tab:targets}
-\input{jetsettargets}
-\vspace{\baselineskip} % Terrible, but out of time.
-\end{table*}
-
-Jetset's evaluation was dependent upon getting several firmware images into a steady state emulation, where the emulator would run without crashing.
-The core targets for this evaluation were a Raspberry Pi 2, a single-board computer based on the Broadcom BCM2836 system-on-a-chip (SoC); a Collins Aerospace CMU-900, an electronic system used on many Boeing 737 aircraft, responsible for handling digital communications between the aircraft and ground stations with an AMD Am486, Intel 486-compatible processor; and a Schweitzer Engineering Laboratories SEL-751 feeder protection relay, used to protect power grid systems, leveraging a MCF54455, a 32-bit microprocessor implementing the ColdFire ISA.
-The statistics on the emulation of these systems are given in Table~\ref{tab:targets}.
-
-Details on the emulated and symbolically executed versions of the execution are given by the top and bottom portions of the table. 
-Differences, in generally, are explanable due to the backtracking of symbolic execution when it hits an infinite loop (in these cases Jetset must re-execute code and take a different path), and due to slower inference-stage execution.
-In the case of the Raspberry Pi, this led to an SD host controller command timeout, resulting in an error message and a register dump. 
-During emulated execution with synthetic devices, the SD host controller initializes without a command timeout, thus, the executed blocks counts differ; however, the resulting emulation is resilient. 
-
-While it was not addressed in the original publication, the testing of these systems also involved significant amounts of fuzz-testing using a custom built fuzzer that integrated AFL and QEMU, similar to FirmAFL~\cite{zheng2019firm}, but without requiring the modification of the target program.
-It achieved this feat by performing a process-tree snapshot of the entire QEMU process while preserving speed by mounting QEMU's files into a RAM filesystem.
-In the proposed dissertation, more detail on this fuzzer's implementation and the technical novelties would be provided---valuable due to the fact that the fuzzer has seen continued use after the paper's publication by a number of unaffiliated researchers.
-
-The two targets of fuzzing were the Raspberry Pi and the CMU-900.
-Both fuzzing sessions targeted the OS system call boundaries of Linux and VRTX, respectively.
-While no novel vulnerabilities were found in Linux, all recovered fuzzing outputs were equivalent between the emulateed and physical versions of the Raspberry Pi.
-The CMU-900, however, had significantly more successful results.
-The AFL fuzzer found 2963 unique code paths during 200 hours of fuzzing, over 200 of which resulted in meaningful crashes.
-One of these code paths, crashing on a function return, was bootstrapped into a privilege escalation vulnerability using a ROP chain by the author.
-
-To validate this exploit on the physical device, for which the firmware version was different, the author had to build a ground truth QEMU emulation for the second firmware, and then write dataloading code to upload an handcrafted, shimmed version of the VRTX operating system which could inject the malicious system call at a realistic point in the physical device's execution.
-This process was successful, and due to the complexity of relocating the shim code on the memory-constrained physical device while maintaining a true-to-reality execution of the system, required hundreds of lines of hand-written x86 assembly.
-
-The discovery and crafting of this exploit would be further elucidated and detailed within the proposed thesis, and is valuable as it later led to the discovery of three remote denial-of-service vulnerabilities on the CMU-900 (unpublished), that cause the machine to crash due to maliciously crafted aircraft communication and reporting system (ACARS) messages.\footnote{Because ACARS messages also have a ``broadcast'' mode, these messages couldbe used to crash a large number of airplanes' CMU-900's simultaneously.}
-
-\subsubsection{Discussion}
-
-The Jetset work was a novel contribution to a yound domain of firmware rehosting, and thus, the techniques and methodologies adopted during symbolic execution and fuzzing had limitations. 
-For one, the resulting emulation was not perfect.
-However, a perfect emulation was not necessary for useful results.
-While Jetset only explored and inferred constraints for a single execution path, the results of fuzzing these emulations led to a real vulnerability that was disclosed to the embedded system's vendor.
-
-The current technical landscape of of symbolic execution and fuzzing on embedded systems is severely limited by support for microarchitectural abstractions, as, to the author's knowledge, all current embedded system fuzzers require modifications to the firmware under evaluation, and all symbolic executors fail to support all complex processor features, e.g. x86 task switching.
-\emph{The proposed dissertation will address solutions to this limitation, both in the presentation of InteGreat and in detailing the construction of yAFL, the fuzzer Jetset used to discover the CMU-900 vulnerability.}
-
-\subsection{Story Beyond the Eye}
-
-In \emph{Story Beyond the Eye} we found that many current redactions of PDF text are insecure due to non-redacted character positioning information, determined by the \emph{glyph shifting} algorithms PDF producers use.
-Subpixel-sized horizontal shifts in redacted and non-redacted characters can be recovered and used to effectively \emph{deredact} first and last names---these shifts add additional information to the width of redacted information and can be dependent upon redacted information but not themselves redacted.
-These findings affected redactions where the text underneath the black box is removed from the PDF.
-
-The system uses models of glyph shifting algorithms to correctly fingerprint the information left by redacted text, and was able to ``break'' hundreds of real-world PDF redactions, including in documents of historical relevance, OIG investigation reports, and FOIA responses.
-The work also included an extensive notification of affected parties, demonstrating the broad impact of the work.
-
-\subsubsection{Techniques}
-
-\begin{figure}[h!]
-\centering
-\includegraphics[width=2in]{tj.pdf}
-    \caption{The TJ text showing operator, which specifies the glyphs to render and, by reference to a font object (not shown), their widths, along with any associated positional adjustments, given in text space units.}\label{fig:tj}
-\end{figure}
-
-The significant discovery of \emph{Story Beyond the Eye} was the existence and utilization of a novel redacted text information leak.
-PDF documents can render text in numerous ways, including by use of a text showing operator, one of which (TJ) is depicted in Figure~\ref{fig:tj}. 
-The TJ operator takes as arguments a string of text and a vector of \emph{positional adjustments} which displace the character with respect to a default position. 
-This default position is usually a fixed offset from the previous character equivalent to the \emph{advance width} of the previous character defined elsewhere in the PDF document.
-
-Glyph advance widths and glyph shifts create a security concern, and \emph{Story Beyond the Eye} found that most PDF redaction tools replace text selected for redaction with a single large shift of the same width as the redacted text showing operator, creating the two significant security risks:
-\begin{itemize}
-	\item The precise width of the redaction can be used to eliminate potential redacted texts, and is made more distinct than advance widths alone by glyph shifts.
-	\item Any non-redacted glyph shifts conditioned on redacted glyphs can be used to eliminate potential redacted texts.
-\end{itemize}
-The work also addressed concerns related to nonexcising redactions. 
-These redactions are cases where the text underneath the redaction can be selected and copied to the system clipboard from the PDF document.
-
-Glyph shifts may then be classified as \emph{independent} or \emph{dependent}, where the former implies they are not determined by any particular character in the document, and the latter implies that they are---this is precisely dangerous if the character they are conditioned on is redacted.
-This itself is not dangerous if the amount of information leaked on redacted text is small or the redaction tools themselves remove this information.
-Thus, the methodology of the paper was split into extracting and evaluating glyph shifting schemes, e.g. from Microsoft Word's ``Save-as-PDF'' feature, and evaluating the information removed by redaction tools.
-
-The latter corresponded to an evaluation of what types of information the redaction tools leaked, and after reverse engineering the schemes produced by 11 redaction tools, including Adobe Acrobat, the paper finds \emph{none} but those that rasterize the document entirely sufficiently mitigate these leaks.
-Two of the tools were completely broken, and did not remove the text at all (created nonexcising redactions): the present author notified them of this problem and as a result of this both the tools have published patches.
-
-\lstset{ %
-language=C++,                % choose the language of the code
-basicstyle=\ttfamily\footnotesize,       % the size of the fonts that are used for the code
-numbers=left,                   % where to put the line-numbers
-numberstyle=\footnotesize,      % the size of the fonts that are used for the line-numbers
-stepnumber=1,                   % the step between two line-numbers. If it is 1 each line will be numbered
-numbersep=5pt,                  % how far the line-numbers are from the code
-backgroundcolor=\color{white},  % choose the background color. You must add \usepackage{color}
-showspaces=false,               % show spaces adding particular underscores
-showstringspaces=false,         % underline spaces within strings
-showtabs=false,                 % show tabs within strings adding particular underscores
-frame=single,           % adds a frame around the code
-tabsize=2,          % sets default tabsize to 2 spaces
-captionpos=b,           % sets the caption-position to bottom
-breaklines=true,        % sets automatic line breaking
-breakatwhitespace=false,    % sets if automatic breaks should only happen at whitespace
-escapeinside={\%*}{*)}          % if you want to add a comment within your code
-}
-
-\begin{figure}
-\begin{lstlisting}
-for (int j = i + 1; j < vs->size(); j++) {
-    t = ttfScaledWidths[j] / 1000;
-    d = internalMSWordWidths[j] / internalMSWordFontSize;
-    ttf += t;
-    msWord += d;
-    disp = ttf - msWord;
-    if (((disp > 0.003) || (disp < -0.003)) && i != vs->size() - 1) {
-      int adj = disp * 1000 + 0.5;
-      vs->setShift(j, adj);
-      ttf = msWord = 0;
-    } else {
-      vs->setShift(j, 0);
-    }
-}
-\end{lstlisting}
-\caption{Snippet of reverse engineered code representing how Microsoft Word leaks redacted character information into non-redacted characters in a PDF document.
-    }
-\label{fig:msword-snippet}
-\end{figure}
-
-The extraction and evaluation of the glyph shifting schemes involved precise tracing of PDF producer software and reverse engineering to extract an exact model of their positioning algorithms for text. 
-Microsoft Word, in particular, provided glyph shift values that were \emph{highly} dependent on redacted glyphs, due to a floating-point error accumulation algorithm that compares the ``real'' PDF position of a glyph with a set of artificial positions determined by the full text of a given line.
-A portion of this behavior, one of the error accumulators, is presented in Fig.~\ref{fig:msword-snippet}.
-Note the internal widths used on line 3 of the figure are determined by a loop with no overflow reset and the redacted information held by the accumulator is not zero after a single shift is written: this detail is given in the publication's appendix.
-
-The extraction of the prior algoithm and reverse engineering of PDF producer structures in a rich area and was not given sufficient space due to constraints on the original publication.
-The proposed dissertation would provide both an explanation of how these algorithms were extracted as well as some of the challenges and solutions developed when addressing the problems of discovering and breaking redactions, and classifying glyph shifting schemes.
-
-\subsubsection{Methodology}
-
-\paragraph{Synthetic Evaluation.}
-The evaluation of the vulnerability these shifting schemes create for redacted text was based on the simulation of redactions on text from the New York Times annotated corpus~\cite{nytCorp} using various \emph{dictionaries}.
-This represents how the amount of information leaked depends on prior information about the redacted text. 
-For example, if we know the redacted text is one of 151,671 American surnames, then this redaction leaks at most $log_{2}(151, 671) \approx 17.2$ bits. 
-Notably, these dictionaries included:
-
-\input{defs}
-
-\begin{itemize}[nosep]
-\item\textit{Str.} All strings of 3--16 characters in length starting with a uppercase or lowercase letter followed by lowercase letters.
-\item\textit{Acrn.} All strings of 2--5 uppercase characters.
-% \item\textit{Pron.} English third-person pronouns which are often redacted to avoid revealing a person's gender.
-\item\textit{Word.} English words including some proper nouns.
-\item\textit{Ctry.} Official and common names of countries.
-\item\textit{Rgn.} Names of regions, a superset of \emph{Ctry}.
-\item\textit{Natl.} Nationalities, demonyms, and adjectives of regions and nationalities, sourced from lists on Wikipedia.
-\item\textit{FN.} American given (first) names.
-\item\textit{LN.} American surnames (last names).
-\item\textit{FI$\times$LN.} All combinations of a name initial followed by surname (\emph{LN}).
-\item\textit{FN$\times$LN.} All combinations of a given name (\emph{FN}) followed by a surname (\emph{LN}).
-\item\textit{FNLN and FILN.} \emph{FN$\times$LN} and \emph{FI$\times$LN} filtered to only include combinations of name and surname that appear in the voter registration databases of the three US states.
-    North Carolina~\cite{ncVoterData}, Ohio~\cite{ohVoterData}, and Washington~\cite{waVoterData} were chosen based upon the availability of publicly accessible data.
-\end{itemize}
-
-\begin{table}
-\centering
-\caption{
-    Dictionaries containing candidate texts used for evaluating deredaction. 
-    Stop words are excluded from the statistics.
-}\label{tab:dicts}
-\small\input{dicts}
-\end{table}
-
-The amount of information leaked in the simulated redaction was measured both upon a uniform ($H_{u}(X)$) and empirical ($H_{e}(X)$) frequency distribution of each dictionary entry, i.e. one wherein the adversary knows which dictionary entries are more likely to occur and one wherein they treat each dictionary entry as equally possible.
-It is therefore important to understand the size of these dictionaries and the number of bits of information they contain \emph{in total} with respect to both uniform and empirical distributions, so that the following synthetic evaluation results may be placed in context.
-Scale measurements are given in Table~\ref{tab:dicts}.
-
-\begin{table*}
-\centering\small
-\caption{Number of bits leaked (left) and probability of a correct guess (right) for different shifting schemes in simulated redactions of the NYT corpus set in 10pt font.
-    Refer to Table~\ref{tab:dicts} for the total number of bits of information present in the candidate dictionary.
-    ``Probability correct guess'' refers to the likelihood of randomly selecting the redacted word given the (typically small) set of matching candidate texts.
-    }
-\label{tab:nyt10}
-\input{nyt10}
-\end{table*}
-
-The results of this synthetic evaluation are given in Table~\ref{tab:nyt10}.
-Note that four different fonts and three glyph shifting schemes were evaluated: Courier presents a strawman result for a purely monospaced font with no shifts.
-The \emph{Un} column presents the efficacy of deredaction provided an attack utilizing the width of the PDF text alone, if no adjustments occur.
-This is a specific case of an \emph{independent} shifting scheme.
-The \emph{W07} and \emph{W19} columns present the Microsoft Word shifting schemes in the 2007 and 2019 desktop versions of Microsoft Word.
-These, in turn, depict changes in the algorithm over time and highlight the historical significance of the attack, as it has been possible in documents over the range of at least a decade.
-
-\paragraph{Real Evaluation.}
-The present author also evaluated the extent of information leaks in real documents, using the following corpora, which were attained using a combination of webscraping and redaction location algorithms.
-The latter were custom-made, and included separate algorithms for excising and nonexcising redactions.
-Both were constructed to identify single-color boxes in-between and on top of text, respectively.
-
-\begin{enumerate}
-    \item \emph{FOIA.} Documents obtained via the US Freedom of Information Act (FOIA) on governmentattic.org~\cite{govattic}. 
-This corpus provides us with independently selected documents with some public interest.
-    \item \emph{OIG.} Office of the Inspector General (OIG) reports hosted by oversight.gov~\cite{oigReports}. 
-The OIG is a US Government oversight branch tasked with preventing unlawful operation of other government branches.
-This corpus allowed us to measure the impact deredaction may have on documents from a high-profile and large organization.
-    \item \emph{DNSA.} Digital National Security Archive (DNSA) documents produced after 2010~\cite{dnsaSite}. 
-The DNSA is a set of historical US government documents curated by scholars. 
-That is, we found redaction information leaks affect significant historical documents.
-    \item \emph{RECAP.} CourtListener's RECAP court document archive.
-RECAP mirrors PACER, the US Federal Courts' docketing system~\cite{pacerSite}, and contains over 10 million documents.
-We use RECAP to measure the impact of nonexcising redactions (discussed below).
-    \item \emph{rRECAP} the subset of RECAP documents returned for the search string ``redacted''.
-We chose to include rRECAP because running the excising redaction location algorithm mentioned in on the entire RECAP corpus would be both computationally and financially prohibitive.
-\end{enumerate}
-
-Only the RECAP corpus contained nonexcising redactions and our results for this corpus were reported with respect to nonexcising redactions.
-Our results for all other corpora were reported with respect to excising redactions.
-
-In this evaluation it was necessary to correctly infer the specific glyph shifting scheme of each document and whether that document was vulnerable, thus a framework for classifying a redaction was developed.
-This framework included the additional constraint that the redaction could be reasonably classified as a name, in order to reduce the false positives rate created by attempting deredaction on entries outside the evaluated dictionary, FN$\times$LN.
-A real-world redaction was evaluated if either:
-\begin{enumerate}[nosep]
-    \item The redacted text is present in the PDF (vulnerable to copy-paste attack); or
-    \item The redacted text is not present, but the document retains glyph shifting scheme information where:
-        \begin{itemize}[nosep]
-            \item The scheme matches a Word ``Save as PDF'' shifting scheme,
-            \item The redaction appears to be a name, e.g. ``Jane'', and
-            \item The redaction is the first from left to right on the line of text.
-        \end{itemize}
-\end{enumerate}
-
-\begin{table}
-  \centering
-    \caption{Top: Glyph shifting schemes identified in redacted corpora pages. Bottom: Deredaction results for names tagged.}
-\label{tab:wildres}
-\small\input{wild-res}
-\end{table}
-
-The resulting evaluation broke hundreds of redactions in real world documents. 
-The results of this are reported in Table~\ref{tab:wildres}.
-It is important to note the definition of \emph{broke}: the FN$\times$LN dictionary contained $1.5 \times 10^{10}$ entries, so a reduction to a few hundred or thousands possibilities is significant.
-We confirmed with affected parties that often the feasible dictionary is much smaller, and the results for $FNLN$ in Table~\ref{tab:nyt10} emphasize the attack is dangerous.
-Many additional verifications of these findings were performed but are omitted from this proposal due to space constraints.
-
-\subsubsection{Discussion}
-
-Due to the complex technical matter of deredaction and methodological novelties in the evaluation of deredaction attacks, the publication did not include, sufficiently, a description of two facets of deredaction that are as essential as a robust empirical evaluation.
-First, the extraction of glyph shiftng schemes from Microsoft Work, Adobe Acrobat, and other systems was non-trivial.
-Moreover, the present author performed this extraction and modeling by hand, a problem largely solved by the InteGreat tool, presented next.
-
-One important feature of these algorithms was their dependence on floating point error: they could not be lifted to continuous equations without resulting in an incorrect representation.
-This is deeply related to the assumptions made in the InteGreat work, which ignores floating point error when lifting continuous control equations from binary firmware for the purposes of verification.
-Clearly there are domains wherein this floating point error is and is not \emph{useful}, and the proposed dissertation will address this problem in a greater depth by contrasting the two works, something the works, independently considered, could not discuss.
-
-The other key success (and limitation) of \emph{Story Beyond the Eye} was the paper's treatment of the unknown: deredaction may never be considered as determining the correct redacted text, but only as ruling out possibilities with the assumption that the observed evidence is complete, correct, and correctly understood.
-The paper also highlights important notions core to the use of leaked or remaining information after information destruction (redaction) occurs, most notably the notion of a \emph{prior}, provided by a dictionary.
-These ideas are, to the present author's knowledge, hardly discussed in the context of lifting and binary program analysis, and both the Jetset and InteGreat works would have benefitted from a richer comprehension of this facet of information loss.
-The proposed dissertation will more closely consider the role that prior information may play in the domains of firmware rehosting and continuous equation lifting.
-
-\subsection{InteGreat}
-
-InteGreat reinterprets bitvector-domain symbolic execution of program slices into the theory of uninterpreted functions to perform modular, nestable function summarization and lifting.
-The tool provides researchers with a novel design language for automatically abstracting complex programs into mathematical equations.
-In the submitted publication, InteGreat's lifting was used to determine the sensor inputs necessary to precisely destabilize the reactor pressure of a chemical plant, discover novel problems in the domain of firmware rehosting, and discover a flaw in the implemented version of a published quad-copter stabilization algorithm.
-
-\subsubsection{Methodology}
-\subsubsection{Techniques}
-\subsubsection{Discussion}
+However, the resulting publications also make significant strides towards identifying the proper responses to each of these problems through the use of abstraction, careful evaluation of the algorithms under study, consideration of microarchitectural semantics, and novel binary analysis techniques.
+The proposed dissertation will work to unify these findings and present them within a framework that is at once both detailed, empirically justified, clear, and unified.
+It will also work to outline the core limitations of these works, and therefore provide useful commentary for future work in the domain of binary program analysis.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Section 4: Management Plan %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Time Line and Management Plan}
+\section{Time Line}
 
-\begin{table}[H]
-\label{table1}
-\renewcommand{\arraystretch}{0}
-\caption{Project schedule.  PIs are Person One (P1), Person Two (P2), graduate student is GS, and the undergraduate student is US.\ Time frame gives the year each activity will occur.}
-\scriptsize
-\begin{tabularx}{\textwidth}{Y c c }
-\hline
-\hline
-\textbf{Research Activity} & \textbf{Personnel} & \textbf{Time Frame}\\
-\hline
-Perform a task that sounds impressive & P2, US & Y1 \T\\
-Perform another super-amazing task & P1, US & Y1 \T\\
-Perform something else that may not be as sexy as the other things & P2, GS & Y1 \T\\
-Wonder why you are such a terrible programmer & P1, US & Y1 \T\\
-Analyze the results and stuff & P1, P2, SS & Y1,Y2 \T\\
-Take the day off and grill some meat & P1, P2, SS & Y1,Y2 \T\\
-Present findings at scientific meetings and publish results in peer-reviewed journals & P1, P2, US, GS & Y1, Y2, Y3\T\B\\
-\hline
-\hline
-\end{tabularx}
-\end{table}
+As the present author has present commitments for employment regardless of the outcome of his doctoral work, the dissertation will be subject to practical constraints on time in accordance with the current University of Illinois policies on dissertation timelines.
+The absolute minimum time between the preliminary exam proposal and defense is four months, and the current scheduled date of the exam is February 24th.
+As a result of aforementioned employment constraints, the present author intends to complete the writing of the defense by July 2023 and the proposed defense will occur at the end of this same month, the schedules of the defense committee permitting and considering all other university requirements have been fulfilled.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Section 5: Science Merit   %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Scientific Merit}
 
-You wanna know how I got these scars? My father was\ldots a drinker, and a fiend. And one night, he goes off crazier than usual. Mommy gets the kitchen knife to defend herself. He doesn't like that, not one bit. So, me watching he takes the knife to her, laughing while he does it. He turns to me and he says: ``Why so serious?''. He comes at me with the knife ``Why so serious?''. He sticks the blade in my mouth. ``Let's put a smile on that face.'' and\ldots Why so serious?
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Section 6: Impact/Outreach %
@@ -409,14 +88,4 @@ This project will have direct impacts on research and education through access t
 
 \vspace{4pt}
 \noindent \underline{\textit{Dissemination}}: Write about how you will disseminate results (i.e., journal articles, workshops, etc).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Section 7: Prior NSF Work  %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Results from Prior Work}
-
-\noindent \emph{\underline{Person One}}: No NSF support in the past five years \newline
-
-\noindent The most relevant prior NSF award to the proposed project for \underline{Person Two} (Co-PI) is: (a) NSF PDM \#\#\#\#\#\#\#, \$000,000, MM/DD/YY to MM/DD/YY; (b) Title: Super Cool Project That Got Funded; (c) Accomplishments related to the {\bf intellectual merit} of this research project include something something. The {\bf broader impacts} include outreach at many levels. Something Something. To date, the grant has funded one post-doc and 1000 graduate students. The project has also involved 500 undergraduate students. (d) To date this project has resulted in 100 conference presentations, one million journal publications (cite them) with one under review (cite it) and two in preparation with well-developed drafts.
-
 \nocite*
